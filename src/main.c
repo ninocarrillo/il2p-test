@@ -63,6 +63,22 @@ int GenRandomBytes(unsigned char *buffer, int count) {
 	return i;
 }
 
+int GenRandomHeader(unsigned char *buffer) {
+	unsigned char pids[14] = {0x10, 0x01, 0x06, 0x07, 0x08, 0xC3, 0xC4, 0xCA, 0xCB, 0xCC, 0xCD, 0xCE, 0xCF, 0xF0 };
+	// Make the callsign and SSID octets:
+	for (int i = 0; i < 14; i++) {
+		buffer[i] = GenRandomCallsignChar() << 1;
+	}
+	// Set the address extension bit and reserved bits:
+	buffer[13] |= 0x61;
+	buffer[6] |= 0x60;
+	// set control byte
+	buffer[14] = 3;
+	// Generate a random IL2P encodable PID
+	buffer[15] = pids[rand() % 15];
+	return 16;
+}
+
 int main(int arg_count, char* arg_values[]) {
 	
 	if (arg_count < 6) {
@@ -145,7 +161,8 @@ int main(int arg_count, char* arg_values[]) {
 
 
 	int ax25_source_packet[MAX_BUFFER];
-	uint16_t il2p_encoded_packet[MAX_BUFFER];
+	uint8_t il2p_encoded_packet[MAX_BUFFER];
+	uint8_t il2p_decoded_packet[MAX_BUFFER];
 
 	for (int i = 0; i <= MAX_BUFFER; i++) {
 		failures[i] = 0;
@@ -191,7 +208,7 @@ int main(int arg_count, char* arg_values[]) {
 			} else {
 				int rip_result = -1;
 				while (rip_result != translatable) {
-					kiss.OutputCount = GenRandomBytes(kiss.Output, 16);
+					kiss.OutputCount = GenRandomHeader(kiss.Output);
 					RipAX25Header(&kiss);
 					rip_result = kiss.RipValid;
 				}
@@ -205,16 +222,33 @@ int main(int arg_count, char* arg_values[]) {
 			// Create packet payload.
 			kiss.OutputCount += GenRandomBytes(&kiss.Output[kiss.OutputCount], payload_length);
 
-			int CRC = CCITT16CalcCRC(kiss.Output, kiss.OutputCount);
-			printf("\r\n CRC: %4x", CRC);
+			printf("\r\nRandom packet generated: ");
+			for (int i = 0; i < kiss.OutputCount; i++) {
+				printf(" %2x", kiss.Output[i]);
+			}
+
+			int encode_CRC = CCITT16CalcCRC(kiss.Output, kiss.OutputCount);
+			printf(" CRC: %4x", encode_CRC);
 			// Perform IL2P Encoding.
-			int il2p_bit_count = IL2PBuildPacket(&kiss, il2p_encoded_packet, &il2p_trx);
+			int il2p_tx_count = IL2PBuildPacket(&kiss, il2p_encoded_packet, &il2p_trx);
 			printf("\r\nIL2P Encoded Packet: ");
 			fflush(stdout);
-			for (int i = 0; i < il2p_bit_count >> 3; i++) {
+			for (int i = 0; i < il2p_tx_count; i++) {
 				printf(" %2x", il2p_encoded_packet[i]);
 
 			}
+			int il2p_rx_count = 0;
+			IL2PReceive(&il2p_trx, il2p_encoded_packet, il2p_tx_count, il2p_decoded_packet);
+			if (il2p_trx.Result == 1) {
+				printf("\r\nPacket received.");
+				il2p_rx_count = il2p_trx.RxByteCount;
+			}
+			for (int i = 0; i < il2p_rx_count; i++) {
+				printf(" %2x", il2p_decoded_packet[i]);
+
+			}
+			int decode_CRC = CCITT16CalcCRC(il2p_decoded_packet, il2p_rx_count);
+			printf(" CRC: %4x", decode_CRC);
 		
 		}
 	}

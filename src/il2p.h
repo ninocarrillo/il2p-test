@@ -120,7 +120,7 @@ typedef struct {
 } IL2P_TRX_struct;
 
 void InitIL2P(IL2P_TRX_struct *);
-int IL2PBuildPacket(KISS_struct *, uint16_t *, IL2P_TRX_struct *);
+int IL2PBuildPacket(KISS_struct *, uint8_t *, IL2P_TRX_struct *);
 void IL2PReceive(IL2P_TRX_struct *, uint8_t *, int, uint8_t *);
 void IL2PConvertToAX25(IL2P_TRX_struct *);
 

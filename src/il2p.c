@@ -21,6 +21,9 @@ void InitIL2P(IL2P_TRX_struct *self){
     self->RXState = IL2P_RX_SEARCH;
     self->TransparentMode = 0;
     self->FSK4Syncword = 0;
+    self->SyncTolerance = 2;
+    self->InvertRXData = 0;
+    self->TrailingCRC = 1;
 }
 
 
@@ -332,7 +335,7 @@ uint16_t PIDtoAX25(uint16_t IL2PPID) {
     return AX25PID;
 }
 
-int IL2PBuildPacket(KISS_struct *kiss, uint16_t *output, IL2P_TRX_struct *TRX) {
+int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
     int payload_count = 0;
     int16_t blocks = 0;
     int16_t bigblocks = 0;
@@ -347,19 +350,24 @@ int IL2PBuildPacket(KISS_struct *kiss, uint16_t *output, IL2P_TRX_struct *TRX) {
     TRX->TransparentMode = 0;
     if (!kiss->RipValid) { // Invalid header rip
         TRX->TransparentMode = 1;
+        printf("\r\n IL2P Encoder Invalid Rip.");
     }
     if (kiss->AX25Callsign7Bit) { // Callsigns aren't SIXBIT compatible
         TRX->TransparentMode = 1;
+        printf("\r\n IL2P Encoder 7 bit callsigns.");
     }
     if (kiss->AX25ExtendedMode) { // AX.25 extended mode
         TRX->TransparentMode = 1;
+        printf("\r\n IL2P Encoder Extended Mode.");
     }
     if ((kiss->AX25ControlByte & 0xEF) == 0x6F) { // SABME
         TRX->TransparentMode = 1;
+        printf("\r\n IL2P Encoder SABME.");
     }
     if (kiss->AX25PIDByteExists) {
         if (PIDtoIL2P(kiss->AX25PIDByte) == 0) {
             TRX->TransparentMode = 1;
+            printf("\r\n IL2P Encoder odd PID.");
         }
     }
     // Install the 24-bit sync word.
@@ -533,9 +541,9 @@ int IL2PBuildPacket(KISS_struct *kiss, uint16_t *output, IL2P_TRX_struct *TRX) {
     for (int i = 0; i < output_addr; i++) {
         output[i] = TRX->TXBuffer[i];
     }
-    return(output_addr * 8);
+    return(output_addr);
     
-    // Returns number of bits in packet
+    // Returns number of bytes in packet
 }
 
 #define IL2P_CHECK_AND_SEND\
@@ -563,32 +571,17 @@ int IL2PBuildPacket(KISS_struct *kiss, uint16_t *output, IL2P_TRX_struct *TRX) {
     }
 
 void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_count, uint8_t *output_buffer) {
-    int16_t i, j;
+    int i, j;
     uint16_t input_data;
     uint16_t k = 0;
-    int16_t x;
-    //uint32_t Inverted4FSKSyncword = Invert4FSKDouble(0x5D57DF7F);
-    if ((Receiver->TrailingCRC == 1) || (Receiver->Interleave == 1)) {
-//        Receiver->RS[0].MinimumErrorDistance = 0;
-//        Receiver->RS[1].MinimumErrorDistance = 0;
-        Receiver->SyncTolerance = 2;
-    } else {
-//        Receiver->RS[0].MinimumErrorDistance = 1;
-//        Receiver->RS[1].MinimumErrorDistance = 1;
-        Receiver->SyncTolerance = 0;
-    }
-    
-    if (Receiver->FSK4Syncword == 1) {
-        Receiver->SyncTolerance = 0;
-    }
+    int x;
+
     
     Receiver->Result = 0; // 0 = no packet, 1 = packet received, -1 = packet failed
     for (i = 0; i < input_count; i++) { // step through each input word
         input_data = input_buffer[i];
         for (j = 0; j < 8; j++) { //step through each bit, MSB first
             k++;
-            int16_t sync_dist_norm;
-//            int16_t sync_dist_inverted;
             switch (Receiver->RXState) {
                 case IL2P_RX_SEARCH:
                     
@@ -599,22 +592,9 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                     }
                     input_data <<= 1;
                     // Detect sync word match.
-                        Receiver->SyncWord.ULI = IL2P_SYNCWORD;
-                        sync_dist_norm = BitDistance8(Receiver->Work.Byte, Receiver->SyncWord.Byte, IL2P_SYNCWORD_LENGTH);
-//                        sync_dist_inverted = 24 - sync_dist_norm;
+                    Receiver->SyncWord.ULI = IL2P_SYNCWORD;
                     
-//                    if (sync_dist_inverted < sync_dist_norm) {
-//                        Receiver->InvertRXData = 1;
-//                        x = sync_dist_inverted;
-//                    } else {
-//                        Receiver->InvertRXData = 0;
-//                        x = sync_dist_norm;
-//                    }
-                    
-                    Receiver->InvertRXData = 0;
-                    x = sync_dist_norm;
-                    
-                    if (x <= Receiver->SyncTolerance) {
+                    if (BitDistance8(Receiver->Work.Byte, Receiver->SyncWord.Byte, IL2P_SYNCWORD_LENGTH) <= Receiver->SyncTolerance) {
                         Receiver->RXState = IL2P_RX_HEADER;
                         Receiver->RXBufferIndex = 0;
                         Receiver->BitIndex = 0;

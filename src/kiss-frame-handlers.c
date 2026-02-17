@@ -2,6 +2,60 @@
 #include "kiss-frame-handlers.h"
 #include "kiss.h"
 
+int CheckPID(int AX25PID) {
+    // Returns IL2P PID given AX25 PID. Returns 0 if no match.
+    uint16_t IL2PPID;
+    switch (AX25PID) {
+    case 0x10:
+        IL2PPID = 0x02;
+        break;
+    case 0x01:
+        IL2PPID = 0x03;
+        break;
+    case 0x06:
+        IL2PPID = 0x04;
+        break;
+    case 0x07:
+        IL2PPID = 0x05;
+        break;
+    case 0x08:
+        IL2PPID = 0x06;
+        break;
+    case 0xC3:
+        IL2PPID = 0x07;
+        break;
+    case 0xC4:
+        IL2PPID = 0x08;
+        break;
+    case 0xCA:
+        IL2PPID = 0x09;
+        break;
+    case 0xCB:
+        IL2PPID = 0x0A;
+        break;
+    case 0xCC:
+        IL2PPID = 0x0B;
+        break;
+    case 0xCD:
+        IL2PPID = 0x0C;
+        break;
+    case 0xCE:
+        IL2PPID = 0x0D;
+        break;
+    case 0xCF:
+        IL2PPID = 0x0E;
+        break;
+    case 0xF0:
+        IL2PPID = 0x0F;
+        break;
+    default:
+        // Indicate this PID is not encodable, this will trigger transparent mode.
+        IL2PPID = 0x0;
+        break;
+    }
+    return IL2PPID;
+}
+
 void RipAX25Header(KISS_struct *kiss) {
     int i;
     kiss->RipValid = 1;
@@ -81,6 +135,11 @@ void RipAX25Header(KISS_struct *kiss) {
         if ((kiss->AX25FrameType == AX25_I) || (kiss->AX25UControlFieldType == AX25_UCTL_UI)) {
             kiss->AX25PIDByte = kiss->Output[15];
             kiss->AX25PIDByteExists = 1;
+            // Check if this PID is IL2P mappable:
+            if (!CheckPID(kiss->AX25PIDByte)) {
+                kiss->RipValid = 0;
+            }
+
         } else {
             kiss->AX25PIDByte = 0;
             kiss->AX25PIDByteExists = 0;
