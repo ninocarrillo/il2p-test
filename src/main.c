@@ -6,7 +6,7 @@
 #include "crc.h"
 #include "vector_errors.h"
 
-#define MAX_BUFFER 1500
+#define MAX_BUFFER 1300
 
 int GenRandomCallsignChar(void) {
 	// Generate a random capital letter or numeric digit
@@ -131,7 +131,7 @@ int main(int arg_count, char* arg_values[]) {
 		return(-1);
 	}
 
-	if (payload_length > 0) {
+	if (payload_length == 0) {
 		if (max_errors > 15) {
 			printf("\r\nMax error count %i is too large for zero length payload. \r\nMust be less than or equal to 15.\r\n", max_errors);
 			return(-1);
@@ -240,6 +240,7 @@ int main(int arg_count, char* arg_values[]) {
 			// printf(" CRC: %4x", encode_CRC);
 			// Perform IL2P Encoding.
 			int il2p_tx_count = IL2PBuildPacket(&kiss, il2p_encoded_packet, &il2p_trx);
+			printf("\r\nIL2P Packet Size: %i", il2p_tx_count);
 			// printf("\r\nIL2P Encoded Packet: ");
 			// fflush(stdout);
 			// for (int i = 0; i < il2p_tx_count; i++) {
@@ -328,6 +329,10 @@ int main(int arg_count, char* arg_values[]) {
 	printf("\r\nDecoder Rejected for CRC by Error Count:");
 	for (int i = 0; i <= max_errors; i++) {
 		printf("\r\n%i, %i", i, decoder_reject_crc[i]);
+	}
+	printf("\r\nDecoder Detection Failures by Error Count:");
+	for (int i = 0; i <= max_errors; i++) {
+		printf("\r\n%i, %i", i, decoder_no_detect[i]);
 	}
 	printf("\r\nUndetected Failures by Error Count:");
 	for (int i = 0; i <= max_errors; i++) {

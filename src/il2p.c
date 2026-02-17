@@ -21,7 +21,7 @@ void InitIL2P(IL2P_TRX_struct *self){
     self->RXState = IL2P_RX_SEARCH;
     self->TransparentMode = 0;
     self->FSK4Syncword = 0;
-    self->SyncTolerance = 2;
+    self->SyncTolerance = 1;
     self->InvertRXData = 0;
     self->TrailingCRC = 1;
     self->SisterLastChecksum = -1;
@@ -351,24 +351,19 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
     TRX->TransparentMode = 0;
     if (!kiss->RipValid) { // Invalid header rip
         TRX->TransparentMode = 1;
-        printf("\r\n IL2P Encoder Invalid Rip.");
     }
     if (kiss->AX25Callsign7Bit) { // Callsigns aren't SIXBIT compatible
         TRX->TransparentMode = 1;
-        printf("\r\n IL2P Encoder 7 bit callsigns.");
     }
     if (kiss->AX25ExtendedMode) { // AX.25 extended mode
         TRX->TransparentMode = 1;
-        printf("\r\n IL2P Encoder Extended Mode.");
     }
     if ((kiss->AX25ControlByte & 0xEF) == 0x6F) { // SABME
         TRX->TransparentMode = 1;
-        printf("\r\n IL2P Encoder SABME.");
     }
     if (kiss->AX25PIDByteExists) {
         if (PIDtoIL2P(kiss->AX25PIDByte) == 0) {
             TRX->TransparentMode = 1;
-            printf("\r\n IL2P Encoder odd PID.");
         }
     }
     // Install the 24-bit sync word.
