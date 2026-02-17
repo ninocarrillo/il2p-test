@@ -25,7 +25,7 @@ typedef struct {
     int ErrorMags[MAX_GENPOLY_ROOTS];
 	int ErrorLocatorPoly[MAX_GENPOLY_ROOTS];
 	int ErrorLocatorRoots[MAX_GENPOLY_ROOTS];
-	int *DataBlock;
+	unsigned char *DataBlock;
     int FirstRoot;
     int NumRoots;
     int FieldOrder;

@@ -21,7 +21,7 @@ void InitRS2(int, int, RS2_def_struct*);
 // end of the original array.
 // Arg1: pointer to first word of input array
 // Arg2: word count of input array
-void RSEncode(int *, int, RS2_def_struct*);
+void RSEncode(unsigned char *, int, RS2_def_struct*);
 
 // RSDecode
 // Computes error locations and values based on Reed Solomon parity symbols
@@ -30,7 +30,7 @@ void RSEncode(int *, int, RS2_def_struct*);
 // Arg2: word count of input array
 // Returns number of errors corrected. Returns negative if correction failed.
 // Clobbers input array.
-int RSDecode(int *, int, RS2_def_struct*);
+int RSDecode(unsigned char *, int, RS2_def_struct*);
 
 
 

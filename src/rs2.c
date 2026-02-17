@@ -21,7 +21,7 @@ void InitRS2(int first_root, int num_roots, RS2_def_struct *rs) {
     }
 }
 
-void RSEncode(int *message, int message_size, RS2_def_struct *rs) {
+void RSEncode(unsigned char *message, int message_size, RS2_def_struct *rs) {
 	// Calculate Reed Solomon parity symbols.
 	// Parity symbols are appended after the message.
 	for (int i = 0; i < rs->NumRoots; i++) {
@@ -193,7 +193,7 @@ void calc_forney(RS2_def_struct *rs) {
 	}
 }
 
-int RSDecode(int *data_block, int block_size, RS2_def_struct *rs) {
+int RSDecode(unsigned char *data_block, int block_size, RS2_def_struct *rs) {
 	rs->BlockSize = block_size;
 	rs->DataBlock = data_block;
     

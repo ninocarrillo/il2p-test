@@ -68,7 +68,7 @@ int main(int arg_count, char* arg_values[]) {
 	if (arg_count < 6) {
 		printf("Not enough arguments.\r\n");
 		printf("Usage:\r\nil2p-test <header restriction> <payload length> <max errors> <runs> <seed>\r\n");
-		printf("\r\nExample: il2p-test 0 4 1000000 0");
+		printf("\r\nExample: il2p-test 3 0 4 1000000 0");
 		printf("\r\n\n     header restricion:");
 		printf("\r\n              0 - No restriction (equal distribution of translatable and non-translatable headers. (slow)");
 		printf("\r\n              1 - Only random translatable headers. (slow)");
@@ -135,6 +135,7 @@ int main(int arg_count, char* arg_values[]) {
 	
 
 	IL2P_TRX_struct il2p_trx;
+	InitIL2P(&il2p_trx);
 	KISS_struct kiss;
 
 	int decoder_indicated_failures[MAX_BUFFER];
@@ -144,6 +145,7 @@ int main(int arg_count, char* arg_values[]) {
 
 
 	int ax25_source_packet[MAX_BUFFER];
+	uint16_t il2p_encoded_packet[MAX_BUFFER];
 
 	for (int i = 0; i <= MAX_BUFFER; i++) {
 		failures[i] = 0;
@@ -206,6 +208,13 @@ int main(int arg_count, char* arg_values[]) {
 			int CRC = CCITT16CalcCRC(kiss.Output, kiss.OutputCount);
 			printf("\r\n CRC: %4x", CRC);
 			// Perform IL2P Encoding.
+			int il2p_bit_count = IL2PBuildPacket(&kiss, il2p_encoded_packet, &il2p_trx);
+			printf("\r\nIL2P Encoded Packet: ");
+			fflush(stdout);
+			for (int i = 0; i < il2p_bit_count >> 3; i++) {
+				printf(" %2x", il2p_encoded_packet[i]);
+
+			}
 		
 		}
 	}
