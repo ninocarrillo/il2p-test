@@ -4,6 +4,7 @@
 #include "kiss.h"
 #include "kiss-frame-handlers.h"
 #include "crc.h"
+#include "vector_errors.h"
 
 #define MAX_BUFFER 1500
 
@@ -154,22 +155,30 @@ int main(int arg_count, char* arg_values[]) {
 	InitIL2P(&il2p_trx);
 	KISS_struct kiss;
 
-	int decoder_indicated_failures[MAX_BUFFER];
-	int failures[MAX_BUFFER];
+	int decoder_reject_header[MAX_BUFFER];
+	int decoder_reject_payload[MAX_BUFFER];
+	int decoder_reject_crc[MAX_BUFFER];
+	int decoder_reject[MAX_BUFFER];
+	int decoder_no_detect[MAX_BUFFER];
+	int decoder_accept[MAX_BUFFER];
+	int actual_successes[MAX_BUFFER];
 	int undetected_failures[MAX_BUFFER];
-	int successes[MAX_BUFFER];
 
 
 	int ax25_source_packet[MAX_BUFFER];
 	uint8_t il2p_encoded_packet[MAX_BUFFER];
 	uint8_t il2p_decoded_packet[MAX_BUFFER];
+	uint8_t corrupt_packet[MAX_BUFFER];
+	int error_vector[MAX_BUFFER];
 
 	for (int i = 0; i <= MAX_BUFFER; i++) {
-		failures[i] = 0;
+		decoder_reject_header[i] = 0;
+		decoder_reject_payload[i] = 0;
+		decoder_reject_crc[i] = 0;
+		decoder_accept[i] = 0;
+		actual_successes[i] = 0;
 		undetected_failures[i] = 0;
-		successes[i] = 0;
-		decoder_indicated_failures[i] = 0;
-		ax25_source_packet[i] = 0;
+		decoder_no_detect[i] = 0;
 	}
 
 
@@ -214,43 +223,115 @@ int main(int arg_count, char* arg_values[]) {
 				}
 			}
 
-			if (kiss.RipValid) {
-				printf("\r\nValid rip.");
-			} else {
-				printf("\r\nInvalid rip.");
-			}
+			// if (kiss.RipValid) {
+			// 	printf("\r\nValid rip.");
+			// } else {
+			// 	printf("\r\nInvalid rip.");
+			// }
 			// Create packet payload.
 			kiss.OutputCount += GenRandomBytes(&kiss.Output[kiss.OutputCount], payload_length);
 
-			printf("\r\nRandom packet generated: ");
-			for (int i = 0; i < kiss.OutputCount; i++) {
-				printf(" %2x", kiss.Output[i]);
-			}
+			// printf("\r\nRandom packet generated: ");
+			// for (int i = 0; i < kiss.OutputCount; i++) {
+			// 	printf(" %2x", kiss.Output[i]);
+			// }
 
 			int encode_CRC = CCITT16CalcCRC(kiss.Output, kiss.OutputCount);
-			printf(" CRC: %4x", encode_CRC);
+			// printf(" CRC: %4x", encode_CRC);
 			// Perform IL2P Encoding.
 			int il2p_tx_count = IL2PBuildPacket(&kiss, il2p_encoded_packet, &il2p_trx);
-			printf("\r\nIL2P Encoded Packet: ");
-			fflush(stdout);
+			// printf("\r\nIL2P Encoded Packet: ");
+			// fflush(stdout);
+			// for (int i = 0; i < il2p_tx_count; i++) {
+			// 	printf(" %2x", il2p_encoded_packet[i]);
+
+			// }
+
+			// Generate an error vector.
+			GenErrorVector(error_vector, 0xFF, il2p_tx_count, error_count);
+
+			// Make a noisy packet.
 			for (int i = 0; i < il2p_tx_count; i++) {
-				printf(" %2x", il2p_encoded_packet[i]);
-
+				corrupt_packet[i] = error_vector[i] ^ il2p_encoded_packet[i];
 			}
+
 			int il2p_rx_count = 0;
-			IL2PReceive(&il2p_trx, il2p_encoded_packet, il2p_tx_count, il2p_decoded_packet);
-			if (il2p_trx.Result == 1) {
-				printf("\r\nPacket received.");
-				il2p_rx_count = il2p_trx.RxByteCount;
+			IL2PReceive(&il2p_trx, corrupt_packet, il2p_tx_count, il2p_decoded_packet);
+			switch(il2p_trx.Result) {
+			case 0:
+				// No packet detection.
+				decoder_no_detect[error_count]++;
+				break;
+			case 1:
+				// Decoder indicates success
+				decoder_accept[error_count]++;
+				break;
+			case -1:
+				// Decoder indicates header RS decode unsuccessful
+				decoder_reject_header[error_count]++;
+				break;
+			case -2:
+			case -3:
+				// Decoder indicates payload decode unsuccessful
+				decoder_reject_payload[error_count]++;
+				break;
+			case -4:
+				// Decoder indicates CRC mismatch
+				decoder_reject_crc[error_count]++;
 			}
-			for (int i = 0; i < il2p_rx_count; i++) {
-				printf(" %2x", il2p_decoded_packet[i]);
 
+
+			// compare the decoded packet to the original packet
+			if (CompareVectors(il2p_decoded_packet, kiss.Output, kiss.OutputCount)) {
+				// The packets differ.
+				if (il2p_trx.Result > 0) {
+					// But decoder indicated success
+					undetected_failures[error_count]++;
+				}
+			} else {
+				// The packets are the same
+				actual_successes[error_count]++;
 			}
-			int decode_CRC = CCITT16CalcCRC(il2p_decoded_packet, il2p_rx_count);
-			printf(" CRC: %4x", decode_CRC);
+
+
+			// if (il2p_trx.Result == 1) {
+			// 	printf("\r\nPacket received.");
+			// 	il2p_rx_count = il2p_trx.RxByteCount;
+			// }
+			// for (int i = 0; i < il2p_rx_count; i++) {
+			// 	printf(" %2x", il2p_decoded_packet[i]);
+
+			// }
+			// int decode_CRC = CCITT16CalcCRC(il2p_decoded_packet, il2p_rx_count);
+			// printf(" CRC: %4x", decode_CRC);
 		
 		}
+	}
+
+
+	printf("\r\nDecode Success by Error Count:");
+	for (int i = 0; i <= max_errors; i++) {
+		printf("\r\n%i, %i", i, actual_successes[i]);
+	}
+	printf("\r\nDecoder Indicated Success by Error Count:");
+	for (int i = 0; i <= max_errors; i++) {
+		printf("\r\n%i, %i", i, decoder_accept[i]);
+	}
+	printf("\r\nDecoder Rejected for Header by Error Count:");
+	for (int i = 0; i <= max_errors; i++) {
+		printf("\r\n%i, %i", i, decoder_reject_header[i]);
+	}
+	printf("\r\nDecoder Rejected for Payload by Error Count:");
+	for (int i = 0; i <= max_errors; i++) {
+		printf("\r\n%i, %i", i, decoder_reject_payload[i]);
+	}
+	printf("\r\nDecoder Rejected for CRC by Error Count:");
+	for (int i = 0; i <= max_errors; i++) {
+		printf("\r\n%i, %i", i, decoder_reject_crc[i]);
+	}
+	printf("\r\nUndetected Failures by Error Count:");
+	for (int i = 0; i <= max_errors; i++) {
+		printf("\r\n%i, %i", i, undetected_failures[i]);
 	}
 
 	printf("\r\nDone.\r\n");

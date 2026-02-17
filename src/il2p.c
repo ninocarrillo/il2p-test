@@ -24,6 +24,7 @@ void InitIL2P(IL2P_TRX_struct *self){
     self->SyncTolerance = 2;
     self->InvertRXData = 0;
     self->TrailingCRC = 1;
+    self->SisterLastChecksum = -1;
 }
 
 
@@ -577,7 +578,14 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
     int x;
 
     
-    Receiver->Result = 0; // 0 = no packet, 1 = packet received, -1 = packet failed
+    Receiver->Result = 0; 
+    // Results:
+    //         0: No packet detected
+    //         1: Valid packet detected
+    //         -1: Packet rejected for header error
+    //         -2: Packet rejected for BigBlock payload error
+    //         -3: Packet rejected for SmallBlock payload error
+    //         -4: Packet rejected for CRC error
     for (i = 0; i < input_count; i++) { // step through each input word
         input_data = input_buffer[i];
         for (j = 0; j < 8; j++) { //step through each bit, MSB first
@@ -731,7 +739,7 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                                 }
 
                             } else {
-                                // Receive failure
+                                // Header decode failure
                                 Receiver->RXState = IL2P_RX_SEARCH;
                                 Receiver->Result = -1;
                             }

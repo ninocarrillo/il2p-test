@@ -48,7 +48,8 @@ void CombineVectors(int *in1, int *in2, int *out, int count) {
 	}
 }
 
-int CompareVectors(int *a, int *b, int size) {
+
+int CompareVectors(uint8_t *a, uint8_t *b, int size) {
 	int errors = 0;
 	for (int i = 0; i < size; i++) {
 		if (a[i] ^ b[i]) {
