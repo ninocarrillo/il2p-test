@@ -9,5 +9,6 @@
 #include "stdint.h"
 
 int16_t Ceiling(int16_t, int16_t);
+int16_t BitDistance8(uint8_t *, uint8_t *, int16_t );
 
 #endif

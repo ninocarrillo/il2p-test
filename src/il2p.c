@@ -24,6 +24,27 @@ void InitIL2P(IL2P_TRX_struct *self){
 }
 
 
+// Hamming(7,4) Decoding Table
+// Enter this table with 7-bit encoded value, high bit mased.
+// Returns 4-bit decoded value.
+uint16_t Hamming74DecodeTable[128] = {  \
+      0x0, 0x0, 0x0, 0x3, 0x0, 0x5, 0xe, 0x7, \
+      0x0, 0x9, 0xe, 0xb, 0xe, 0xd, 0xe, 0xe, \
+      0x0, 0x3, 0x3, 0x3, 0x4, 0xd, 0x6, 0x3, \
+      0x8, 0xd, 0xa, 0x3, 0xd, 0xd, 0xe, 0xd, \
+      0x0, 0x5, 0x2, 0xb, 0x5, 0x5, 0x6, 0x5, \
+      0x8, 0xb, 0xb, 0xb, 0xc, 0x5, 0xe, 0xb, \
+      0x8, 0x1, 0x6, 0x3, 0x6, 0x5, 0x6, 0x6, \
+      0x8, 0x8, 0x8, 0xb, 0x8, 0xd, 0x6, 0xf, \
+      0x0, 0x9, 0x2, 0x7, 0x4, 0x7, 0x7, 0x7, \
+      0x9, 0x9, 0xa, 0x9, 0xc, 0x9, 0xe, 0x7, \
+      0x4, 0x1, 0xa, 0x3, 0x4, 0x4, 0x4, 0x7, \
+      0xa, 0x9, 0xa, 0xa, 0x4, 0xd, 0xa, 0xf, \
+      0x2, 0x1, 0x2, 0x2, 0xc, 0x5, 0x2, 0x7, \
+      0xc, 0x9, 0x2, 0xb, 0xc, 0xc, 0xc, 0xf, \
+      0x1, 0x1, 0x2, 0x1, 0x4, 0x1, 0x6, 0xf, \
+      0x8, 0x1, 0xa, 0xf, 0xc, 0xf, 0xf, 0xf };
+
 // Hamming(7,4) Encoding Table
 // Enter this table with the 4-bit value to be encoded.
 // Returns 7-bit encoded value, with high bit zero'd.
@@ -294,6 +315,22 @@ uint16_t IL2PHeaderGetSOpcode(uint8_t *output) {
     return opcode;
 }
 
+uint16_t UCTLtoAX25(uint16_t IL2PCTL) {
+    // Returns AX25 CTL given IL2P CTL.
+    uint16_t AX25CTL;
+    uint16_t AX25CTLTable[8] = { 0x2F, 0x43, 0x0F, 0x63, 0x87, 0x03, 0xAF, 0xE3 };
+    AX25CTL = AX25CTLTable[IL2PCTL & 0x7];
+    return AX25CTL;
+}
+
+
+uint16_t PIDtoAX25(uint16_t IL2PPID) {
+    // Returns AX25 PID given IL2P PID. Returns 0 to signal "omit AX25 PID byte".
+    uint16_t AX25PID;
+    uint16_t AX25PIDTable[16] = { 0, 0, 0x10, 0x01, 0x06, 0x07, 0x08, 0xC3, 0xC4, 0xCA, 0xCB, 0xCC, 0xCD, 0xCE, 0xCF, 0xF0 };
+    AX25PID = AX25PIDTable[IL2PPID & 0xF];
+    return AX25PID;
+}
 
 int IL2PBuildPacket(KISS_struct *kiss, uint16_t *output, IL2P_TRX_struct *TRX) {
     int payload_count = 0;
@@ -500,3 +537,417 @@ int IL2PBuildPacket(KISS_struct *kiss, uint16_t *output, IL2P_TRX_struct *TRX) {
     
     // Returns number of bits in packet
 }
+
+#define IL2P_CHECK_AND_SEND\
+    Receiver->MyLastChecksum = CCITT16CalcCRC(Receiver->RXBuffer, Receiver->RXBufferIndex);\
+    if ((uint32_t)Receiver->MyLastChecksum != Receiver->SisterLastChecksum) {\
+        Receiver->HasNewChecksum = 1;\
+        Receiver->Result = 1;\
+        for (int i = 0; i < Receiver->RXBufferIndex; i++) {\
+            output_buffer[i] = Receiver->RXBuffer[i];\
+        }\
+        /*SendKISS(UART, 0, 0, Receiver->RXBuffer, Receiver->RXBufferIndex);*/\
+        Receiver->RxByteCount = Receiver->RXBufferIndex;\
+    } else {\
+        Receiver->Duplicate = 1;\
+    }
+
+
+#define CHOOSE_CRC_OR_NOT \
+    if ((Receiver->TrailingCRC) && (Receiver->RXErrCount > 0)) { \
+        Receiver->RXState = IL2P_RX_CRC; \
+    } else { \
+        Receiver->RXState = IL2P_RX_SEARCH; \
+        IL2P_CHECK_AND_SEND \
+        Receiver->RXBufferIndex = 0; \
+    }
+
+void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_count, uint8_t *output_buffer) {
+    int16_t i, j;
+    uint16_t input_data;
+    uint16_t k = 0;
+    int16_t x;
+    //uint32_t Inverted4FSKSyncword = Invert4FSKDouble(0x5D57DF7F);
+    if ((Receiver->TrailingCRC == 1) || (Receiver->Interleave == 1)) {
+//        Receiver->RS[0].MinimumErrorDistance = 0;
+//        Receiver->RS[1].MinimumErrorDistance = 0;
+        Receiver->SyncTolerance = 2;
+    } else {
+//        Receiver->RS[0].MinimumErrorDistance = 1;
+//        Receiver->RS[1].MinimumErrorDistance = 1;
+        Receiver->SyncTolerance = 0;
+    }
+    
+    if (Receiver->FSK4Syncword == 1) {
+        Receiver->SyncTolerance = 0;
+    }
+    
+    Receiver->Result = 0; // 0 = no packet, 1 = packet received, -1 = packet failed
+    for (i = 0; i < input_count; i++) { // step through each input word
+        input_data = input_buffer[i];
+        for (j = 0; j < 8; j++) { //step through each bit, MSB first
+            k++;
+            int16_t sync_dist_norm;
+//            int16_t sync_dist_inverted;
+            switch (Receiver->RXState) {
+                case IL2P_RX_SEARCH:
+                    
+                    // Search for sync word.
+                    Receiver->Work.ULI <<= 1;
+                    if (input_data & 0x80) { // one bit
+                        Receiver->Work.ULI |= 1;
+                    }
+                    input_data <<= 1;
+                    // Detect sync word match.
+                        Receiver->SyncWord.ULI = IL2P_SYNCWORD;
+                        sync_dist_norm = BitDistance8(Receiver->Work.Byte, Receiver->SyncWord.Byte, IL2P_SYNCWORD_LENGTH);
+//                        sync_dist_inverted = 24 - sync_dist_norm;
+                    
+//                    if (sync_dist_inverted < sync_dist_norm) {
+//                        Receiver->InvertRXData = 1;
+//                        x = sync_dist_inverted;
+//                    } else {
+//                        Receiver->InvertRXData = 0;
+//                        x = sync_dist_norm;
+//                    }
+                    
+                    Receiver->InvertRXData = 0;
+                    x = sync_dist_norm;
+                    
+                    if (x <= Receiver->SyncTolerance) {
+                        Receiver->RXState = IL2P_RX_HEADER;
+                        Receiver->RXBufferIndex = 0;
+                        Receiver->BitIndex = 0;
+                        Receiver->RXErrCount = 0;
+                        Receiver->CRCIndex = 0;
+                        Receiver->ReceiveCRC = 0;
+                    }
+                    break;
+                case IL2P_RX_HEADER:
+                    // Collect and decode the packet header.
+                    Receiver->Work.Byte[3] <<= 1;
+                    if (input_data & 0x80) { // one bit
+                        Receiver->Work.Byte[3] |= 1;
+                    }
+                    Receiver->BitIndex++;
+                    input_data <<= 1;
+                    if (Receiver->BitIndex == 8) {
+                        // One whole byte read. Write it to output.
+                        Receiver->BitIndex = 0;
+                        if (Receiver->InvertRXData) {
+                                Receiver->RXBuffer[Receiver->RXBufferIndex++] = ~Receiver->Work.Byte[3];
+                            
+                        } else {
+                            Receiver->RXBuffer[Receiver->RXBufferIndex++] = Receiver->Work.Byte[3];
+                        }
+                        if (Receiver->RXBufferIndex == IL2P_HEADER_BLOCK_SIZE) {
+                            // RS Decode header
+                            x = RSDecode(Receiver->RXBuffer, IL2P_HEADER_BLOCK_SIZE, &Receiver->RS[0]);
+                            Receiver->RXBufferIndex -= IL2P_HEADER_NUMROOTS;
+                            
+                            if (x >= 0) { // Decode successful
+                                Receiver->RXErrCount += x;
+                                // Unscramble header
+                                Receiver->RXLFSR.ShiftRegister = IL2P_LFSR_RX_PRE;
+                                Unscramble8(Receiver->RXBuffer, IL2P_HEADER_BYTES * 8, &Receiver->RXLFSR);
+                                // Extract data from header
+
+                                // Identify type of IL2P header
+                                Receiver->RXHdrType = IL2PHeaderGetType(&Receiver->RXBuffer[0]);
+                                Receiver->RXHdrCount = IL2PHeaderGetCount(&Receiver->RXBuffer[0x2]);
+
+                                if ((Receiver->RXHdrType & 1) == 1) { // Translated AX.25
+                                    Receiver->RXHdrUI = (Receiver->RXBuffer[0] >> 6) & 0x1;
+                                    Receiver->RXHdrPID = IL2PHeaderGetPID(&Receiver->RXBuffer[0x1]);
+                                    if (Receiver->RXHdrUI) {
+                                        // This is an AX.25 UI frame. PID exists.
+                                        Receiver->RXHdrAX25FrameType = AX25_U;
+                                        Receiver->RXHdrAX25PIDExists = 1;
+                                        // Get P/F bit, OPCODE, C bit
+                                        Receiver->RXHdrPFBit = (Receiver->RXBuffer[0x5] >> 6) & 0x1;
+                                        Receiver->RXHdrOpcode = IL2PHeaderGetN(&Receiver->RXBuffer[0x6]);
+                                        Receiver->RXHdrCBit = (Receiver->RXBuffer[0x9] >> 6) & 0x1;
+                                    } else {
+                                        switch (Receiver->RXHdrPID) {
+                                        case 0:
+                                            // AX.25 Supervisory Frame. No PID.
+                                            Receiver->RXHdrAX25FrameType = AX25_S;
+                                            Receiver->RXHdrAX25PIDExists = 0;
+                                            // Get P/F bit, N(R), C bit, OPCODE
+                                            Receiver->RXHdrPFBit = (Receiver->RXBuffer[0x5] >> 6) & 0x1;
+                                            Receiver->RXHdrNR = IL2PHeaderGetN(&Receiver->RXBuffer[0x6]);
+                                            Receiver->RXHdrOpcode = IL2PHeaderGetSOpcode(&Receiver->RXBuffer[0xA]);
+                                            Receiver->RXHdrCBit = (Receiver->RXBuffer[0x9] >> 6) & 0x1;
+                                            break;
+                                        case 1:
+                                            // AX.25 Unnumbered Frame (not UI). No PID.
+                                            Receiver->RXHdrAX25FrameType = AX25_U;
+                                            Receiver->RXHdrAX25PIDExists = 0;
+                                            // Get P/F bit, OPCODE, C bit
+                                            Receiver->RXHdrPFBit = (Receiver->RXBuffer[0x5] >> 6) & 0x1;
+                                            Receiver->RXHdrOpcode = IL2PHeaderGetN(&Receiver->RXBuffer[0x6]);
+                                            Receiver->RXHdrCBit = (Receiver->RXBuffer[0x9] >> 6) & 0x1;
+                                            break;
+                                        default:
+                                            // AX.25 Information Frame. PID exists.
+                                            Receiver->RXHdrAX25FrameType = AX25_I;
+                                            Receiver->RXHdrAX25PIDExists = 1;
+                                            // Get P/F bit, N(R), N(S)
+                                            Receiver->RXHdrPFBit = (Receiver->RXBuffer[0x5] >> 6) & 0x1;
+                                            Receiver->RXHdrNR = IL2PHeaderGetN(&Receiver->RXBuffer[0x6]);
+                                            Receiver->RXHdrNS = IL2PHeaderGetN(&Receiver->RXBuffer[0x9]);
+                                            Receiver->RXHdrCBit = 1; // All I frames are commands.
+                                            break;
+                                        }
+                                    }
+
+                                    // Extract callsigns.
+                                    IL2PHeaderGetCallsign(&Receiver->RXBuffer[0], Receiver->RXDestCall);
+                                    IL2PHeaderGetCallsign(&Receiver->RXBuffer[0x6], Receiver->RXSrcCall);
+
+                                    // Extract SSIDs.
+                                    Receiver->RXDestSSID = (Receiver->RXBuffer[12] >> 4) & 0xF;
+                                    Receiver->RXSrcSSID = Receiver->RXBuffer[12] & 0xF;
+
+                                    // Set the write index to make room for an AX.25 header.
+                                    if (Receiver->RXHdrAX25PIDExists) {
+                                        Receiver->RXBufferIndex = 16; // I and UI frames have a PID byte.
+                                    } else {
+                                        Receiver->RXBufferIndex = 15; // Everything else does not.
+                                    }
+
+                                    IL2PConvertToAX25(Receiver); // Write the recomposed header to the accumulator buffer.
+
+                                } else if ((Receiver->RXHdrType & 1) == 0) { // Transparent encapsulation.
+                                    Receiver->RXBufferIndex = 0;
+
+                                }
+
+
+                                if (Receiver->RXHdrCount > 0) {
+
+                                    // This packet contains data
+
+                                            // MaxFEC header
+                                            Receiver->RXBlocks = Ceiling(Receiver->RXHdrCount, IL2P_MAXFEC_RS_BLOCKSIZE);
+                                            Receiver->RXBlocksize = Receiver->RXHdrCount / Receiver->RXBlocks;
+                                            Receiver->RXBigBlocks = Receiver->RXHdrCount - (Receiver->RXBlocks * Receiver->RXBlocksize);
+                                            Receiver->RXBlockIndex = 0;
+                                            Receiver->RXBlockByteCount = 0;
+                                            Receiver->RXNumRoots = IL2P_MAXFEC_NUMROOTS;
+                                    Receiver->RXDecoder = 1;
+                                    InitRS2(0, Receiver->RXNumRoots, &Receiver->RS[1]);
+                                    if (Receiver->RXBigBlocks > 0) {
+                                        Receiver->RXState = IL2P_RX_BIGBLOCKS;
+                                        Receiver->RXBlocksize += 1;
+                                    } else {
+                                        Receiver->RXState = IL2P_RX_SMALLBLOCKS;
+                                    }
+
+                                } else {
+                                    // This packet is only a header
+                                    CHOOSE_CRC_OR_NOT
+
+                                }
+
+                            } else {
+                                // Receive failure
+                                Receiver->RXState = IL2P_RX_SEARCH;
+                                Receiver->Result = -1;
+                            }
+                        }
+                    }
+                    break;
+                case IL2P_RX_BIGBLOCKS:
+                    // Collect and decode payload blocks.
+                    Receiver->Work.Byte[3] <<= 1;
+                    if (input_data & 0x80) { // one bit
+                        Receiver->Work.Byte[3] |= 1;
+                    }
+                    Receiver->BitIndex++;
+                    input_data <<= 1;
+                    if (Receiver->BitIndex == 8) {
+                        // One whole byte read. Write it to output.
+                        Receiver->BitIndex = 0;
+                        if (Receiver->InvertRXData) {
+                                Receiver->RXBuffer[Receiver->RXBufferIndex++] = ~Receiver->Work.Byte[3];
+                        } else {
+                            Receiver->RXBuffer[Receiver->RXBufferIndex++] = Receiver->Work.Byte[3];
+                        }
+                        Receiver->RXBlockByteCount++;
+                        if (Receiver->RXBlockByteCount == Receiver->RXBlocksize + Receiver->RXNumRoots) {
+                            // RS Decode this block
+                            x = RSDecode(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlockByteCount, &Receiver->RS[Receiver->RXDecoder]);
+
+                            if (x >= 0) {
+                                // Decode successful
+                                Receiver->RXErrCount += x;
+                                Receiver->RXLFSR.ShiftRegister = IL2P_LFSR_RX_PRE;
+                                Unscramble8(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlocksize * 8, &Receiver->RXLFSR);
+                                Receiver->RXBlockByteCount = 0;
+                                // Back up the output write index to overwrite the parity symbols
+                                Receiver->RXBufferIndex -= Receiver->RXNumRoots;
+                                Receiver->RXBlockIndex++;
+                                if (Receiver->RXBlockIndex == Receiver->RXBigBlocks) {
+                                    if (Receiver->RXBlockIndex == Receiver->RXBlocks) {
+                                        // Packet complete
+
+                                        CHOOSE_CRC_OR_NOT
+
+                                    } else {
+                                        Receiver->RXState = IL2P_RX_SMALLBLOCKS;
+                                        Receiver->RXBlockByteCount = 0;
+                                        // Set RXBlocksize to small block size
+                                        Receiver->RXBlocksize -= 1;
+                                    }
+                                }
+                            } else {
+                                // Receive failure for this packet
+                                Receiver->RXState = IL2P_RX_SEARCH;
+                                Receiver->Result = -2;
+                            }
+                        }
+                    }
+                    break;
+                case IL2P_RX_SMALLBLOCKS:
+
+                    // Collect and decode payload blocks.
+                    Receiver->Work.Byte[3] <<= 1;
+                    if (input_data & 0x80) { // one bit
+                        Receiver->Work.Byte[3] |= 1;
+                    }
+                    Receiver->BitIndex++;
+                    input_data <<= 1;
+                    if (Receiver->BitIndex == 8) {
+                        // One whole byte read. Write it to output.
+                        Receiver->BitIndex = 0;
+                        if (Receiver->InvertRXData) {
+                                Receiver->RXBuffer[Receiver->RXBufferIndex++] = ~Receiver->Work.Byte[3];
+                        } else {
+                            Receiver->RXBuffer[Receiver->RXBufferIndex++] = Receiver->Work.Byte[3];
+                        }
+                        Receiver->RXBlockByteCount++;
+                        if (Receiver->RXBlockByteCount == Receiver->RXBlocksize + Receiver->RXNumRoots) {
+                            // RS Decode this block
+                            x = RSDecode(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlockByteCount, &Receiver->RS[Receiver->RXDecoder]);
+
+                            if (x >= 0) {
+                                // Decode successful
+                                Receiver->RXErrCount += x;
+                                Receiver->RXLFSR.ShiftRegister = IL2P_LFSR_RX_PRE;
+                                Unscramble8(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlocksize * 8, &Receiver->RXLFSR);
+                                Receiver->RXBlockByteCount = 0;
+                                // Back up the output write index to overwrite the parity symbols
+                                Receiver->RXBufferIndex -= Receiver->RXNumRoots;
+                                Receiver->RXBlockIndex++;
+                                if (Receiver->RXBlockIndex == Receiver->RXBlocks) {
+                                    // Packet complete
+
+                                    CHOOSE_CRC_OR_NOT
+
+                                }
+                            } else {
+                                // Receive failure for this packet
+                                Receiver->RXState = IL2P_RX_SEARCH;
+                                Receiver->Result = -3;
+                            }
+                        }
+                    }
+                    break;
+                case IL2P_RX_CRC:
+                    // Collect and decode the Hamming encoded CRC.
+                    Receiver->Work.Byte[3] <<= 1;
+                    if (input_data & 0x80) { // one bit
+                        Receiver->Work.Byte[3] |= 1;
+                    }
+                    Receiver->BitIndex++;
+                    input_data <<= 1;
+                    if (Receiver->BitIndex == 8) {
+                        Receiver->BitIndex = 0;
+                        Receiver->ReceiveCRC <<= 4;
+                        if (Receiver->InvertRXData) {
+                                Receiver->RXBuffer[Receiver->RXBufferIndex++] = ~Receiver->Work.Byte[3];
+                        } else {
+                            Receiver->ReceiveCRC |= Hamming74DecodeTable[Receiver->Work.Byte[3] & 0x7F];
+                        }
+                        Receiver->CRCIndex++;
+                        if (Receiver->CRCIndex == 4) {
+                            Receiver->RXState = IL2P_RX_SEARCH;
+                            Receiver->MyLastChecksum = CCITT16CalcCRC(Receiver->RXBuffer, Receiver->RXBufferIndex);
+                            if ((uint32_t)Receiver->MyLastChecksum != Receiver->SisterLastChecksum) {
+                                if (Receiver->ReceiveCRC == (uint16_t)Receiver->MyLastChecksum) {
+                                    Receiver->HasNewChecksum = 1;
+                                    Receiver->Result = 1;
+                                    for (int i = 0; i < Receiver->RXBufferIndex; i++) {
+                                        output_buffer[i] = Receiver->RXBuffer[i];
+                                    }
+
+                                    /*SendKISS(UART, 0, 0, Receiver->RXBuffer, Receiver->RXBufferIndex);*/
+                                    Receiver->RxByteCount = Receiver->RXBufferIndex;
+                                } else {
+                                    Receiver->Result = -4;
+                                    
+                                }
+                            } else {
+                                Receiver->Duplicate = 1;
+                            }
+                        }
+                    }
+                    break;
+            }
+        }
+    }
+}
+
+void IL2PConvertToAX25(IL2P_TRX_struct *Receiver) {
+    int16_t i;
+    // Install callsigns:
+    for (i = 0; i < 6; i++) {
+        Receiver->RXBuffer[i] = Receiver->RXDestCall[i] << 1;
+        Receiver->RXBuffer[i + 7] = Receiver->RXSrcCall[i] << 1;
+    }
+
+    // Install SSIDs
+    Receiver->RXBuffer[6] = Receiver->RXDestSSID << 1;
+    Receiver->RXBuffer[13] = (Receiver->RXSrcSSID << 1) | 0x01; // Set HDLC address extension bit.
+
+    // Set C bits.
+    if (Receiver->RXHdrCBit) {
+        Receiver->RXBuffer[6] |= 0x80;
+        Receiver->RXBuffer[13] &= 0x7F;
+    } else {
+        Receiver->RXBuffer[13] |= 0x80;
+        Receiver->RXBuffer[6] &= 0x7F;
+    }
+
+    // Set RR bits.
+    Receiver->RXBuffer[6] |= 0x60;
+    Receiver->RXBuffer[13] |= 0x60;
+
+    // Install Control byte.
+    switch (Receiver->RXHdrAX25FrameType) {
+    case AX25_U:
+        Receiver->RXBuffer[14] = UCTLtoAX25(Receiver->RXHdrOpcode);
+        Receiver->RXBuffer[14] |= (Receiver->RXHdrPFBit << 4);
+        break;
+    case AX25_S:
+        Receiver->RXBuffer[14] = 0x01;
+        Receiver->RXBuffer[14] |= (Receiver->RXHdrOpcode << 2);
+        Receiver->RXBuffer[14] |= (Receiver->RXHdrPFBit << 4);
+        Receiver->RXBuffer[14] |= (Receiver->RXHdrNR << 5);
+        break;
+    case AX25_I:
+        Receiver->RXBuffer[14] = 0;
+        Receiver->RXBuffer[14] |= (Receiver->RXHdrNS << 1);
+        Receiver->RXBuffer[14] |= (Receiver->RXHdrPFBit << 4);
+        Receiver->RXBuffer[14] |= (Receiver->RXHdrNR << 5);
+        break;
+    }
+
+    // Install PID byte if it exists.
+    if (Receiver->RXHdrAX25PIDExists) {
+        Receiver->RXBuffer[15] = PIDtoAX25(Receiver->RXHdrPID);
+    }
+
+}
+
