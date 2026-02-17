@@ -144,7 +144,7 @@ int16_t IL2PHeaderInstallSync(uint8_t *output) {
     uint32_t x;
     int16_t i;
     x = IL2P_SYNCWORD;
-    for (i = 0; i < IL2P_SYNCWORD_LENGTH; i++) {
+    for (int i = 0; i < IL2P_SYNCWORD_LENGTH; i++) {
         output[(IL2P_SYNCWORD_LENGTH - 1) - i] = x & 0xFF;
         x >>= 8;
     }
@@ -155,12 +155,12 @@ int16_t IL2PHeaderInstallSpecialSync(uint8_t *output) {
     int16_t i;
     x = 0x77775D;
     //x = 0x55FDDD;
-    for (i = 0; i < 3; i++) {
+    for (int i = 0; i < 3; i++) {
         output[2 - i] = x & 0xFF;
         x >>= 8;
     }
     x = 0x57DF7F;
-    for (i = 0; i < 3; i++) {
+    for (int i = 0; i < 3; i++) {
         output[5 - i] = x & 0xFF;
         x >>= 8;
     }
@@ -169,7 +169,7 @@ int16_t IL2PHeaderInstallSpecialSync(uint8_t *output) {
 
 void IL2PHeaderInstallCount(uint8_t *output, uint16_t count) {
     int16_t i;
-    for (i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
         if (count & 0x200) {
             output[i] |= 0x80;
         } else {
@@ -183,7 +183,7 @@ uint16_t IL2PHeaderGetCount(uint8_t *output) {
     uint16_t count = 0;
     uint16_t tap = 0x200;
     int16_t i;
-    for (i = 0; i < 10; i++) {
+    for (int i = 0; i < 10; i++) {
         if (output[i] & 0x80) {
             count += tap;
         }
@@ -201,7 +201,7 @@ void IL2PHeaderInstallCallsign(uint8_t *output, uint8_t *callsign) {
 
 void IL2PHeaderGetCallsign(uint8_t *output, uint16_t *callsign) {
     int16_t i;
-    for (i = 0; i < 6; i++) {
+    for (int i = 0; i < 6; i++) {
         callsign[i] = (output[i] & 0x3F) + 0x20; // Convert callsign from SIXBIT
     }
 }
@@ -250,7 +250,7 @@ uint16_t IL2PHeaderGetPID(uint8_t *output) {
 
 void IL2PHeaderInstallN(uint8_t *output, uint16_t n) {
     int16_t i;
-    for (i = 0; i < 3; i++) {
+    for (int i = 0; i < 3; i++) {
         if (n & 0x4) {
             output[i] |= 0x40;
         } else {
@@ -262,7 +262,7 @@ void IL2PHeaderInstallN(uint8_t *output, uint16_t n) {
 
 void IL2PHeaderInstallPID(uint8_t *output, uint8_t pid) {
     int16_t i;
-    for (i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++) {
         if (pid & 0x8) {
             output[i] |= 0x40;
         } else {
@@ -296,7 +296,6 @@ uint16_t IL2PHeaderGetSOpcode(uint8_t *output) {
 
 
 int IL2PBuildPacket(KISS_struct *kiss, uint16_t *output, IL2P_TRX_struct *TRX) {
-    int16_t i, j;
     int payload_count = 0;
     int16_t blocks = 0;
     int16_t bigblocks = 0;
@@ -306,8 +305,6 @@ int IL2PBuildPacket(KISS_struct *kiss, uint16_t *output, IL2P_TRX_struct *TRX) {
     int16_t input_addr;
     int16_t encoder;
     int16_t parity_symbols_per_block;
-
-    printf("\r\n Starting IL2P Encode.");
 
     // Determine if this AX25 packet can be translated to IL2P. If not, use Transparent mode.
     TRX->TransparentMode = 0;
@@ -331,10 +328,8 @@ int IL2PBuildPacket(KISS_struct *kiss, uint16_t *output, IL2P_TRX_struct *TRX) {
     // Install the 24-bit sync word.
     if (TRX->FSK4Syncword == 1) {
         output_addr += IL2PHeaderInstallSpecialSync(&TRX->TXBuffer[0]);
-        printf("\r\n Special Sync install");
     } else {
         output_addr += IL2PHeaderInstallSync(&TRX->TXBuffer[0]);
-        printf("\r\n Sync install");
     }
     
     if (TRX->TransparentMode) {
@@ -350,8 +345,6 @@ int IL2PBuildPacket(KISS_struct *kiss, uint16_t *output, IL2P_TRX_struct *TRX) {
         TRX->TXHdrType = 0; // Transparent mode.
         IL2PHeaderInstallType(&TRX->TXBuffer[output_addr], TRX->TXHdrType);
     } else {
-        printf("\r\n IL2P Encoder Translated Mode.");
-        fflush(stdout);
         TRX->TXHdrType = 1; // Translated AX.25.
         IL2PHeaderInstallType(&TRX->TXBuffer[output_addr], TRX->TXHdrType);
 
@@ -433,7 +426,7 @@ int IL2PBuildPacket(KISS_struct *kiss, uint16_t *output, IL2P_TRX_struct *TRX) {
     }
     // DC-balance the header through LFSR scrambling
     TRX->TXLFSR.ShiftRegister = IL2P_LFSR_TX_PRE;
-    //Scramble8(&TRX->TXBuffer[output_addr], IL2P_HEADER_BYTES * 8, 8, &TRX->TXLFSR, 1, 1);
+    Scramble8(&TRX->TXBuffer[output_addr], IL2P_HEADER_BYTES * 8, 8, &TRX->TXLFSR, 1, 1);
 
     // RS encode header with two roots (can correct one symbol error)
     RSEncode(&TRX->TXBuffer[output_addr], 13, &TRX->RS[0]);
@@ -459,15 +452,15 @@ int IL2PBuildPacket(KISS_struct *kiss, uint16_t *output, IL2P_TRX_struct *TRX) {
             }
         }
         
-        for (i = 0; i < bigblocks; i++) {
+        for (int i = 0; i < bigblocks; i++) {
             blockstart = output_addr;
-            for (j = 0; j < smallsize + 1; j++) {
+            for (int j = 0; j < smallsize + 1; j++) {
                 TRX->TXBuffer[output_addr++] = kiss->Output[input_addr++];
             }
 
             // DC-balance block through LFSR scrambling
             TRX->TXLFSR.ShiftRegister = IL2P_LFSR_TX_PRE;
-            //Scramble8(&TRX->TXBuffer[blockstart], (smallsize + 1) * 8, 8, &TRX->TXLFSR, 1, 1);
+            Scramble8(&TRX->TXBuffer[blockstart], (smallsize + 1) * 8, 8, &TRX->TXLFSR, 1, 1);
 
             // Encode this block
             RSEncode(&TRX->TXBuffer[blockstart], smallsize + 1, &TRX->RS[encoder]);
@@ -475,15 +468,15 @@ int IL2PBuildPacket(KISS_struct *kiss, uint16_t *output, IL2P_TRX_struct *TRX) {
         }
 
         // Install smallblocks
-        for (i = bigblocks; i < blocks; i++) {
+        for (int i = bigblocks; i < blocks; i++) {
             blockstart = output_addr;
-            for (j = 0; j < smallsize; j++) {
+            for (int j = 0; j < smallsize; j++) {
                 TRX->TXBuffer[output_addr++] = kiss->Output[input_addr++];
             }
 
             // DC-balance block through LFSR scrambling
             TRX->TXLFSR.ShiftRegister = IL2P_LFSR_TX_PRE;
-            //Scramble8(&TRX->TXBuffer[blockstart], smallsize * 8, 8, &TRX->TXLFSR, 1, 1);
+            Scramble8(&TRX->TXBuffer[blockstart], smallsize * 8, 8, &TRX->TXLFSR, 1, 1);
 
             // Encode this block
             RSEncode(&TRX->TXBuffer[blockstart], smallsize, &TRX->RS[encoder]);
@@ -493,8 +486,8 @@ int IL2PBuildPacket(KISS_struct *kiss, uint16_t *output, IL2P_TRX_struct *TRX) {
     // Calculate the CRC value based on the original parsed KISS frame.
     TRX->TransmitCRC = CCITT16CalcCRC(kiss->Output, kiss->OutputCount);
     // Convert each nibble of the CRC into a Hamming(7,4) word and add it to the transmit buffer.
-    j = 12;
-    for (i = 0; i < 4; i++) {
+    int j = 12;
+    for (int i = 0; i < 4; i++) {
         TRX->TXBuffer[output_addr++] = Hamming74EncodeTable[(TRX->TransmitCRC>>j) & 0xF];
         //TRX->TXBuffer[output_addr++] = i;
         j -= 4;
