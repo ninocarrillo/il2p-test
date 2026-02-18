@@ -21,7 +21,7 @@ void InitIL2P(IL2P_TRX_struct *self){
     self->RXState = IL2P_RX_SEARCH;
     self->TransparentMode = 0;
     self->FSK4Syncword = 0;
-    self->SyncTolerance = 1;
+    self->SyncTolerance = 0;
     self->InvertRXData = 0;
     self->TrailingCRC = 1;
     self->SisterLastChecksum = -1;
