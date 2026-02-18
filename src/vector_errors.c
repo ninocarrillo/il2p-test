@@ -11,14 +11,16 @@ void CopyMessage(int *in, int *out, int size) {
 	}
 }
 
-void GenBERErrorVector(int *buffer, int bits_per_word, int size, float ber) {
+int GenBERErrorVector(int *buffer, int bits_per_word, int size, float ber) {
 	int bit_count = size * bits_per_word;
 	int byte_index = 0;
 	int bit_index = 0;
 	int work = 0;
+	int bit_error_count = 0;
 	for (int i = 0; i < bit_count; i++) {
 		if (((double)rand() / (double)RAND_MAX) < ber) {
 			work |= 1;
+			bit_error_count++;
 		}
 		bit_index++;
 		if (bit_index >= bits_per_word) {
@@ -28,6 +30,7 @@ void GenBERErrorVector(int *buffer, int bits_per_word, int size, float ber) {
 		}
 		work <<= 1;
 	}
+	return bit_error_count;
 }
 
 void CombineVectors(int *in1, int *in2, int *out, int count) {

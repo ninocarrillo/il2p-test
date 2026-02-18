@@ -82,15 +82,17 @@ int GenRandomHeader(unsigned char *buffer) {
 
 int main(int arg_count, char* arg_values[]) {
 	
-	if (arg_count < 6) {
+	if (arg_count < 9) {
 		printf("Not enough arguments.\r\n");
-		printf("Usage:\r\nil2p-test <header restriction> <payload length> <low ber> <high ber> <ber interval> <runs> <seed>\r\n");
-		printf("\r\nExample: il2p-test 0 0 1e-4 1e-3 1e-4 1000000 0");
+		printf("Usage:\r\nil2p-test <header restriction> <sync tolerance> <payload length> <low ber> <high ber> <ber interval> <runs> <seed>\r\n");
+		printf("\r\nExample: il2p-test 0 0 1 1e-4 1e-3 1e-4 1000000 0");
 		printf("\r\n\n     header restricion:");
 		printf("\r\n              0 - No restriction (equal distribution of translatable and non-translatable headers. (slow)");
 		printf("\r\n              1 - Only random translatable headers. (slow)");
 		printf("\r\n              2 - Only random non-translatable headers. (fast)");
 		printf("\r\n              3 - Only random translatable UI headers. (fast)");
+		printf("\r\n\n     sync tolerance:");
+		printf("\r\n              Integer number of bits in error in syncword for decoder match.");
 		printf("\r\n\n     payload length:");
 		printf("\r\n              Integer number representing packet payload byte count. For a header-only packet,");
 		printf("\r\n              set this to 0. Maximum payload length is 1023. ");
@@ -113,12 +115,13 @@ int main(int arg_count, char* arg_values[]) {
 	}
 
 	int header_restriction = atoi(arg_values[1]);
-	int payload_length = atoi(arg_values[2]);
-	float low_ber = atof(arg_values[3]);
-	float high_ber = atof(arg_values[4]);
-	float ber_interval = atof(arg_values[5]);
-	int run_count = atoi(arg_values[6]);
-	int seed = atoi(arg_values[7]);
+	int sync_tolerance = atoi(arg_values[2]);
+	int payload_length = atoi(arg_values[3]);
+	float low_ber = atof(arg_values[4]);
+	float high_ber = atof(arg_values[5]);
+	float ber_interval = atof(arg_values[6]);
+	int run_count = atoi(arg_values[7]);
+	int seed = atoi(arg_values[8]);
 	srand(seed);
 	
 	// Validate arguments
@@ -161,6 +164,7 @@ int main(int arg_count, char* arg_values[]) {
 
 	IL2P_TRX_struct il2p_trx;
 	InitIL2P(&il2p_trx);
+	il2p_trx.SyncTolerance = sync_tolerance;
 	KISS_struct kiss;
 
 	int decoder_reject_header[MAX_BUFFER];
@@ -172,6 +176,7 @@ int main(int arg_count, char* arg_values[]) {
 	int actual_successes[MAX_BUFFER];
 	int undetected_failures[MAX_BUFFER];
 	float ber_record[MAX_BUFFER];
+	float actual_bit_error_record[MAX_BUFFER];
 
 
 	int ax25_source_packet[MAX_BUFFER];
@@ -188,9 +193,10 @@ int main(int arg_count, char* arg_values[]) {
 		actual_successes[i] = 0;
 		undetected_failures[i] = 0;
 		decoder_no_detect[i] = 0;
+		actual_bit_error_record[i] = 0;
 	}
 
-	int ber_count = ((high_ber - low_ber) / ber_interval) + 1;
+	int ber_count = ((high_ber - low_ber) / ber_interval) + 2;
 
 	printf("\r\nStarting %i trials.", ber_count * run_count);
 	int master_count = 1;
@@ -204,7 +210,9 @@ int main(int arg_count, char* arg_values[]) {
 
 	float ber = low_ber;
 	
-	for (int ber_index = 0; ber_index <= ber_count; ber_index++) {
+	for (int ber_index = 0; ber_index < ber_count; ber_index++) {
+		int bit_error_sum = 0;
+		int bit_sum = 0;
 		for (int run_number = 1; run_number <= run_count; run_number++) {
 			if ((master_count++ % print_interval) == 0 ) {
 				printf("=");
@@ -271,7 +279,8 @@ int main(int arg_count, char* arg_values[]) {
 			// Generate an error vector.
 			//GenErrorVector(error_vector, 0xFF, il2p_tx_count, ber_index);
 
-			GenBERErrorVector(error_vector, 8, il2p_tx_count, ber);
+			bit_error_sum += GenBERErrorVector(error_vector, 8, il2p_tx_count, ber);
+			bit_sum += il2p_tx_count * 8;
 			// printf("\r\nERror Vecoto: ");
 			// for(int i = 0; i < il2p_tx_count; i++) {
 			// 	printf(" %x", error_vector[i]);
@@ -334,6 +343,7 @@ int main(int arg_count, char* arg_values[]) {
 		
 		}
 		ber_record[ber_index] = ber;
+		actual_bit_error_record[ber_index] = (float)bit_error_sum / (float)bit_sum;
 		ber += ber_interval;
 	}
 
@@ -365,6 +375,10 @@ int main(int arg_count, char* arg_values[]) {
 	printf("\r\nUndetected Failures by BER:");
 	for (int i = 0; i < ber_count; i++) {
 		printf("\r\n%3.3e, %i", ber_record[i], undetected_failures[i]);
+	}
+	printf("\r\nBER requested, actual: ");
+	for (int i = 0; i < ber_count; i++) {
+		printf("\r\n%3.3e, %3.3e", ber_record[i], actual_bit_error_record[i]);
 	}
 
 	printf("\r\nDone.\r\n");
