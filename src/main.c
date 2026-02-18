@@ -84,8 +84,8 @@ int main(int arg_count, char* arg_values[]) {
 	
 	if (arg_count < 6) {
 		printf("Not enough arguments.\r\n");
-		printf("Usage:\r\nil2p-test <header restriction> <payload length> <max errors> <runs> <seed>\r\n");
-		printf("\r\nExample: il2p-test 3 0 4 1000000 0");
+		printf("Usage:\r\nil2p-test <header restriction> <payload length> <low ber> <high ber> <ber interval> <runs> <seed>\r\n");
+		printf("\r\nExample: il2p-test 0 0 1e-4 1e-3 1e-4 1000000 0");
 		printf("\r\n\n     header restricion:");
 		printf("\r\n              0 - No restriction (equal distribution of translatable and non-translatable headers. (slow)");
 		printf("\r\n              1 - Only random translatable headers. (slow)");
@@ -94,8 +94,12 @@ int main(int arg_count, char* arg_values[]) {
 		printf("\r\n\n     payload length:");
 		printf("\r\n              Integer number representing packet payload byte count. For a header-only packet,");
 		printf("\r\n              set this to 0. Maximum payload length is 1023. ");
-		printf("\r\n\n     max errors:");
-		printf("\r\n              Maximum number of byte errors per packet.");
+		printf("\r\n\n     low ber:");
+		printf("\r\n              Float number, starting bit error rate for trials.");
+		printf("\r\n\n     high ber:");
+		printf("\r\n              Float number, ending bit error rate for trials.");
+		printf("\r\n\n     ber interval:");
+		printf("\r\n              Float number, ber interval between trial batches.");
 		printf("\r\n\n     runs:");
 		printf("\r\n              Integer number of random test cases to perform at each error count. The program");
 		printf("\r\n              will generate a random packet of specified length for each run, and corrupt");
@@ -110,9 +114,11 @@ int main(int arg_count, char* arg_values[]) {
 
 	int header_restriction = atoi(arg_values[1]);
 	int payload_length = atoi(arg_values[2]);
-	int max_errors = atoi(arg_values[3]);
-	int run_count = atoi(arg_values[4]);
-	int seed = atoi(arg_values[5]);
+	float low_ber = atof(arg_values[3]);
+	float high_ber = atof(arg_values[4]);
+	float ber_interval = atof(arg_values[5]);
+	int run_count = atoi(arg_values[6]);
+	int seed = atoi(arg_values[7]);
 	srand(seed);
 	
 	// Validate arguments
@@ -131,24 +137,26 @@ int main(int arg_count, char* arg_values[]) {
 		return(-1);
 	}
 
-	if (payload_length == 0) {
-		if (max_errors > 15) {
-			printf("\r\nMax error count %i is too large for zero length payload. \r\nMust be less than or equal to 15.\r\n", max_errors);
-			return(-1);
-		}
-	} else {
-		if (max_errors > (payload_length + 13)) {
-			printf("\r\nMax error count %i is too large for specified payload size. \r\nMust be less than or equal to %i.\r\n", max_errors, payload_length + 13);
-		}
-	}
-
-	if (max_errors < 1) {
-		printf("\r\nMax error count %i is too small. Must be greater than zero.\r\n", max_errors);
+	if (low_ber < 0) {
+		printf("Low BER %f is too small. Must be at least zero.", low_ber);
 		return(-1);
 	}
 
+	if (high_ber >= 1) {
+		printf("High BER %f is too large. Must be less than 1.", high_ber);
+		return(-1);
+	}
 
-	printf("\r\nSize of int variable is %li bits.", sizeof(int)*8);
+	if (high_ber >= 1) {
+		printf("High BER %f is too large. Must be less than 1.", high_ber);
+		return(-1);
+	}
+
+	if (ber_interval <= 0) {
+		printf("BER interval %f is too small. Must be greater than zero.", ber_interval);
+		return(-1);
+	}
+
 	
 
 	IL2P_TRX_struct il2p_trx;
@@ -163,6 +171,7 @@ int main(int arg_count, char* arg_values[]) {
 	int decoder_accept[MAX_BUFFER];
 	int actual_successes[MAX_BUFFER];
 	int undetected_failures[MAX_BUFFER];
+	float ber_record[MAX_BUFFER];
 
 
 	int ax25_source_packet[MAX_BUFFER];
@@ -181,18 +190,21 @@ int main(int arg_count, char* arg_values[]) {
 		decoder_no_detect[i] = 0;
 	}
 
+	int ber_count = ((high_ber - low_ber) / ber_interval) + 1;
 
-	printf("\r\nStarting %i trials.", (max_errors + 1) * run_count);
+	printf("\r\nStarting %i trials.", ber_count * run_count);
 	int master_count = 1;
 	int prog_bar_segs = 40;
-	int print_interval = ((max_errors + 1) * run_count) / prog_bar_segs;
+	int print_interval = (ber_count * run_count) / prog_bar_segs;
 	printf("\r\n");
 	for (int i = 0; i <= prog_bar_segs; i++) {
 		printf(" ");
 	}
 	printf("]\r[");
+
+	float ber = low_ber;
 	
-	for (int error_count = 0; error_count <= max_errors; error_count++) {
+	for (int ber_index = 0; ber_index <= ber_count; ber_index++) {
 		for (int run_number = 1; run_number <= run_count; run_number++) {
 			if ((master_count++ % print_interval) == 0 ) {
 				printf("=");
@@ -257,7 +269,13 @@ int main(int arg_count, char* arg_values[]) {
 			// }
 
 			// Generate an error vector.
-			GenErrorVector(error_vector, 0xFF, il2p_tx_count, error_count);
+			//GenErrorVector(error_vector, 0xFF, il2p_tx_count, ber_index);
+
+			GenBERErrorVector(error_vector, 8, il2p_tx_count, ber);
+			// printf("\r\nERror Vecoto: ");
+			// for(int i = 0; i < il2p_tx_count; i++) {
+			// 	printf(" %x", error_vector[i]);
+			// }
 
 			// Make a noisy packet.
 			for (int i = 0; i < il2p_tx_count; i++) {
@@ -269,24 +287,24 @@ int main(int arg_count, char* arg_values[]) {
 			switch(il2p_trx.Result) {
 			case 0:
 				// No packet detection.
-				decoder_no_detect[error_count]++;
+				decoder_no_detect[ber_index]++;
 				break;
 			case 1:
 				// Decoder indicates success
-				decoder_accept[error_count]++;
+				decoder_accept[ber_index]++;
 				break;
 			case -1:
 				// Decoder indicates header RS decode unsuccessful
-				decoder_reject_header[error_count]++;
+				decoder_reject_header[ber_index]++;
 				break;
 			case -2:
 			case -3:
 				// Decoder indicates payload decode unsuccessful
-				decoder_reject_payload[error_count]++;
+				decoder_reject_payload[ber_index]++;
 				break;
 			case -4:
 				// Decoder indicates CRC mismatch
-				decoder_reject_crc[error_count]++;
+				decoder_reject_crc[ber_index]++;
 			}
 
 
@@ -295,11 +313,11 @@ int main(int arg_count, char* arg_values[]) {
 				// The packets differ.
 				if (il2p_trx.Result > 0) {
 					// But decoder indicated success
-					undetected_failures[error_count]++;
+					undetected_failures[ber_index]++;
 				}
 			} else {
 				// The packets are the same
-				actual_successes[error_count]++;
+				actual_successes[ber_index]++;
 			}
 
 
@@ -315,36 +333,38 @@ int main(int arg_count, char* arg_values[]) {
 			// printf(" CRC: %4x", decode_CRC);
 		
 		}
+		ber_record[ber_index] = ber;
+		ber += ber_interval;
 	}
 
 
-	printf("\r\nDecode Success by Error Count:");
-	for (int i = 0; i <= max_errors; i++) {
-		printf("\r\n%i, %i", i, actual_successes[i]);
+	printf("\r\nDecode Success by BER:");
+	for (int i = 0; i < ber_count; i++) {
+		printf("\r\n%3.3e, %i", ber_record[i], actual_successes[i]);
 	}
-	printf("\r\nDecoder Indicated Success by Error Count:");
-	for (int i = 0; i <= max_errors; i++) {
-		printf("\r\n%i, %i", i, decoder_accept[i]);
+	printf("\r\nDecoder Indicated Success by BER:");
+	for (int i = 0; i < ber_count; i++) {
+		printf("\r\n%3.3e, %i", ber_record[i], decoder_accept[i]);
 	}
-	printf("\r\nDecoder Rejected for Header by Error Count:");
-	for (int i = 0; i <= max_errors; i++) {
-		printf("\r\n%i, %i", i, decoder_reject_header[i]);
+	printf("\r\nDecoder Rejected for Header by BER:");
+	for (int i = 0; i < ber_count; i++) {
+		printf("\r\n%3.3e, %i", ber_record[i], decoder_reject_header[i]);
 	}
-	printf("\r\nDecoder Rejected for Payload by Error Count:");
-	for (int i = 0; i <= max_errors; i++) {
-		printf("\r\n%i, %i", i, decoder_reject_payload[i]);
+	printf("\r\nDecoder Rejected for Payload by BER:");
+	for (int i = 0; i < ber_count; i++) {
+		printf("\r\n%3.3e, %i", ber_record[i], decoder_reject_payload[i]);
 	}
-	printf("\r\nDecoder Rejected for CRC by Error Count:");
-	for (int i = 0; i <= max_errors; i++) {
-		printf("\r\n%i, %i", i, decoder_reject_crc[i]);
+	printf("\r\nDecoder Rejected for CRC by BER:");
+	for (int i = 0; i < ber_count; i++) {
+		printf("\r\n%3.3e, %i", ber_record[i], decoder_reject_crc[i]);
 	}
-	printf("\r\nDecoder Detection Failures by Error Count:");
-	for (int i = 0; i <= max_errors; i++) {
-		printf("\r\n%i, %i", i, decoder_no_detect[i]);
+	printf("\r\nDecoder Detection Failures by BER:");
+	for (int i = 0; i < ber_count; i++) {
+		printf("\r\n%3.3e, %i", ber_record[i], decoder_no_detect[i]);
 	}
-	printf("\r\nUndetected Failures by Error Count:");
-	for (int i = 0; i <= max_errors; i++) {
-		printf("\r\n%i, %i", i, undetected_failures[i]);
+	printf("\r\nUndetected Failures by BER:");
+	for (int i = 0; i < ber_count; i++) {
+		printf("\r\n%3.3e, %i", ber_record[i], undetected_failures[i]);
 	}
 
 	printf("\r\nDone.\r\n");
