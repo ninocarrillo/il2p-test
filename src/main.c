@@ -101,12 +101,11 @@ int main(int arg_count, char* arg_values[]) {
 		printf("\r\n\n     high ber:");
 		printf("\r\n              Float number, ending bit error rate for trials.");
 		printf("\r\n\n     ber interval:");
-		printf("\r\n              Float number, ber interval between trial batches.");
+		printf("\r\n              Float number, bit error rate increase interval between trial batches.");
 		printf("\r\n\n     runs:");
 		printf("\r\n              Integer number of random test cases to perform at each error count. The program");
 		printf("\r\n              will generate a random packet of specified length for each run, and corrupt");
-		printf("\r\n              the packet with a precise number of random errors in random locations.");
-		printf("\r\n              Error count will span from zero to max errors.");
+		printf("\r\n              the packet with bit errors according to specified bit error rate.");
 		printf("\r\n\n     seed:");
 		printf("\r\n              Integer number used to seed random number generator, for test repeatability.");
 		printf("\r\n");
