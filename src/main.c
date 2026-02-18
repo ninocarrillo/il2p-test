@@ -200,6 +200,8 @@ int main(int arg_count, char* arg_values[]) {
 			}
 
 			int translatable = 0;
+			// If the header is not translatable, reduce the maximum payload length to make room for the header in the payload.
+			int adj_payload_length = payload_length - 16;
 			if (header_restriction == 0) {
 				// No restriction, flip a coin to determine if this should be a translatable header.
 				if (rand() & 0x10) {
@@ -222,6 +224,10 @@ int main(int arg_count, char* arg_values[]) {
 					rip_result = kiss.RipValid;
 				}
 			}
+			if (kiss.RipValid) {
+				// Resture full length payload.
+				adj_payload_length = payload_length;
+			}
 
 			// if (kiss.RipValid) {
 			// 	printf("\r\nValid rip.");
@@ -229,7 +235,7 @@ int main(int arg_count, char* arg_values[]) {
 			// 	printf("\r\nInvalid rip.");
 			// }
 			// Create packet payload.
-			kiss.OutputCount += GenRandomBytes(&kiss.Output[kiss.OutputCount], payload_length);
+			kiss.OutputCount += GenRandomBytes(&kiss.Output[kiss.OutputCount], adj_payload_length);
 
 			// printf("\r\nRandom packet generated: ");
 			// for (int i = 0; i < kiss.OutputCount; i++) {
@@ -239,8 +245,10 @@ int main(int arg_count, char* arg_values[]) {
 			int encode_CRC = CCITT16CalcCRC(kiss.Output, kiss.OutputCount);
 			// printf(" CRC: %4x", encode_CRC);
 			// Perform IL2P Encoding.
-			int il2p_tx_count = IL2PBuildPacket(&kiss, il2p_encoded_packet, &il2p_trx);
-			printf("\r\nIL2P Packet Size: %i", il2p_tx_count);
+			int il2p_tx_count = 0;
+			il2p_tx_count = IL2PBuildPacket(&kiss, il2p_encoded_packet, &il2p_trx);
+
+			//printf("\r\nIL2P Packet Size: %i", il2p_tx_count);
 			// printf("\r\nIL2P Encoded Packet: ");
 			// fflush(stdout);
 			// for (int i = 0; i < il2p_tx_count; i++) {

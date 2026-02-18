@@ -167,7 +167,6 @@ uint16_t PIDtoIL2P(uint16_t AX25PID) {
 
 int16_t IL2PHeaderInstallSync(uint8_t *output) {
     uint32_t x;
-    int16_t i;
     x = IL2P_SYNCWORD;
     for (int i = 0; i < IL2P_SYNCWORD_LENGTH; i++) {
         output[(IL2P_SYNCWORD_LENGTH - 1) - i] = x & 0xFF;
@@ -177,7 +176,6 @@ int16_t IL2PHeaderInstallSync(uint8_t *output) {
 }
 int16_t IL2PHeaderInstallSpecialSync(uint8_t *output) {
     uint32_t x;
-    int16_t i;
     x = 0x77775D;
     //x = 0x55FDDD;
     for (int i = 0; i < 3; i++) {
@@ -193,7 +191,6 @@ int16_t IL2PHeaderInstallSpecialSync(uint8_t *output) {
 }
 
 void IL2PHeaderInstallCount(uint8_t *output, uint16_t count) {
-    int16_t i;
     for (int i = 0; i < 10; i++) {
         if (count & 0x200) {
             output[i] |= 0x80;
@@ -207,7 +204,6 @@ void IL2PHeaderInstallCount(uint8_t *output, uint16_t count) {
 uint16_t IL2PHeaderGetCount(uint8_t *output) {
     uint16_t count = 0;
     uint16_t tap = 0x200;
-    int16_t i;
     for (int i = 0; i < 10; i++) {
         if (output[i] & 0x80) {
             count += tap;
@@ -225,7 +221,6 @@ void IL2PHeaderInstallCallsign(uint8_t *output, uint8_t *callsign) {
 }
 
 void IL2PHeaderGetCallsign(uint8_t *output, uint16_t *callsign) {
-    int16_t i;
     for (int i = 0; i < 6; i++) {
         callsign[i] = (output[i] & 0x3F) + 0x20; // Convert callsign from SIXBIT
     }
@@ -274,7 +269,6 @@ uint16_t IL2PHeaderGetPID(uint8_t *output) {
 }
 
 void IL2PHeaderInstallN(uint8_t *output, uint16_t n) {
-    int16_t i;
     for (int i = 0; i < 3; i++) {
         if (n & 0x4) {
             output[i] |= 0x40;
@@ -286,7 +280,6 @@ void IL2PHeaderInstallN(uint8_t *output, uint16_t n) {
 }
 
 void IL2PHeaderInstallPID(uint8_t *output, uint8_t pid) {
-    int16_t i;
     for (int i = 0; i < 4; i++) {
         if (pid & 0x8) {
             output[i] |= 0x40;
@@ -341,11 +334,10 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
     int16_t blocks = 0;
     int16_t bigblocks = 0;
     int16_t smallsize = 0;
-    int16_t output_addr = 0;
+    int output_addr = 0;
     int16_t blockstart;
     int16_t input_addr;
     int16_t encoder;
-    int16_t parity_symbols_per_block;
 
     // Determine if this AX25 packet can be translated to IL2P. If not, use Transparent mode.
     TRX->TransparentMode = 0;
@@ -366,7 +358,7 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
             TRX->TransparentMode = 1;
         }
     }
-    // Install the 24-bit sync word.
+    // Install sync word
     if (TRX->FSK4Syncword == 1) {
         output_addr += IL2PHeaderInstallSpecialSync(&TRX->TXBuffer[0]);
     } else {
@@ -479,7 +471,6 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
             blocks = Ceiling(payload_count, IL2P_MAXFEC_RS_BLOCKSIZE); // largest block size is 255-IL2P_MAXFEC_NUMROOTS=IL2P_MAXFEC_BLOCKSIZE
             smallsize = payload_count / blocks;
             bigblocks = payload_count - (smallsize * blocks); // bigblock size is 1 bigger than smallblocks
-            parity_symbols_per_block = IL2P_MAXFEC_NUMROOTS;
 
         encoder = 1;
         // Install bigblocks
@@ -505,7 +496,7 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
 
             // Encode this block
             RSEncode(&TRX->TXBuffer[blockstart], smallsize + 1, &TRX->RS[encoder]);
-            output_addr+= parity_symbols_per_block;
+            output_addr+= IL2P_MAXFEC_NUMROOTS;
         }
 
         // Install smallblocks
@@ -521,7 +512,7 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
 
             // Encode this block
             RSEncode(&TRX->TXBuffer[blockstart], smallsize, &TRX->RS[encoder]);
-            output_addr+= parity_symbols_per_block;
+            output_addr+= IL2P_MAXFEC_NUMROOTS;
         }
     }
     // Calculate the CRC value based on the original parsed KISS frame.

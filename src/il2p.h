@@ -59,8 +59,8 @@ typedef struct {
     LFSR_struct TXLFSR;
     int32_t SignalPower;
     int32_t NoisePower;
-    uint8_t TXBuffer[1300];
-    uint8_t RXBuffer[1300];
+    uint8_t TXBuffer[1125];
+    uint8_t RXBuffer[1125];
     uint16_t RXBufferIndex;
     int16_t RXState;
     int16_t RXErrCount;
