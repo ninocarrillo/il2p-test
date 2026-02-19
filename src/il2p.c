@@ -459,7 +459,7 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
     }
     // DC-balance the header through LFSR scrambling
     TRX->TXLFSR.ShiftRegister = IL2P_LFSR_TX_PRE;
-    Scramble(&TRX->TXBuffer[output_addr], IL2P_HEADER_BYTES * 8, 8, &TRX->TXLFSR, 1, 1);
+    Scramble(&TRX->TXBuffer[output_addr], IL2P_HEADER_SIZE * 8, 8, &TRX->TXLFSR, 1, 1);
 
     // RS encode header with two roots (can correct one symbol error)
     RSEncode(&TRX->TXBuffer[output_addr], 13, &TRX->RS[0]);
@@ -468,7 +468,7 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
 
 
     if (payload_count > 0) {
-            blocks = Ceiling(payload_count, IL2P_MAXFEC_RS_BLOCKSIZE); // largest block size is 255-IL2P_MAXFEC_NUMROOTS=IL2P_MAXFEC_BLOCKSIZE
+            blocks = Ceiling(payload_count, IL2P_MAX_BLOCKSIZE); 
             smallsize = payload_count / blocks;
             bigblocks = payload_count - (smallsize * blocks); // bigblock size is 1 bigger than smallblocks
 
@@ -496,7 +496,7 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
 
             // Encode this block
             RSEncode(&TRX->TXBuffer[blockstart], smallsize + 1, &TRX->RS[encoder]);
-            output_addr+= IL2P_MAXFEC_NUMROOTS;
+            output_addr+= IL2P_PAYLOAD_NUMROOTS;
         }
 
         // Install smallblocks
@@ -512,7 +512,7 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
 
             // Encode this block
             RSEncode(&TRX->TXBuffer[blockstart], smallsize, &TRX->RS[encoder]);
-            output_addr+= IL2P_MAXFEC_NUMROOTS;
+            output_addr+= IL2P_PAYLOAD_NUMROOTS;
         }
     }
     // Calculate the CRC value based on the original parsed KISS frame.
@@ -614,16 +614,16 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                         } else {
                             Receiver->RXBuffer[Receiver->RXBufferIndex++] = Receiver->Work.Byte[3];
                         }
-                        if (Receiver->RXBufferIndex == IL2P_HEADER_BLOCK_SIZE) {
+                        if (Receiver->RXBufferIndex == IL2P_HEADER_SIZE) {
                             // RS Decode header
-                            x = RSDecode(Receiver->RXBuffer, IL2P_HEADER_BLOCK_SIZE, &Receiver->RS[0]);
+                            x = RSDecode(Receiver->RXBuffer, IL2P_HEADER_SIZE, &Receiver->RS[0]);
                             Receiver->RXBufferIndex -= IL2P_HEADER_NUMROOTS;
                             
                             if (x >= 0) { // Decode successful
                                 Receiver->RXErrCount += x;
                                 // Unscramble header
                                 Receiver->RXLFSR.ShiftRegister = IL2P_LFSR_RX_PRE;
-                                UnScramble(Receiver->RXBuffer, IL2P_HEADER_BYTES * 8, &Receiver->RXLFSR);
+                                UnScramble(Receiver->RXBuffer, IL2P_HEADER_SIZE * 8, &Receiver->RXLFSR);
                                 // Extract data from header
 
                                 // Identify type of IL2P header
@@ -703,14 +703,12 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                                     // This packet contains data
 
                                             // MaxFEC header
-                                            Receiver->RXBlocks = Ceiling(Receiver->RXHdrCount, IL2P_MAXFEC_RS_BLOCKSIZE);
+                                            Receiver->RXBlocks = Ceiling(Receiver->RXHdrCount, IL2P_MAX_BLOCKSIZE);
                                             Receiver->RXBlocksize = Receiver->RXHdrCount / Receiver->RXBlocks;
                                             Receiver->RXBigBlocks = Receiver->RXHdrCount - (Receiver->RXBlocks * Receiver->RXBlocksize);
                                             Receiver->RXBlockIndex = 0;
                                             Receiver->RXBlockByteCount = 0;
-                                            Receiver->RXNumRoots = IL2P_MAXFEC_NUMROOTS;
-                                    Receiver->RXDecoder = 1;
-                                    InitRS2(0, Receiver->RXNumRoots, &Receiver->RS[1]);
+                                    InitRS2(0, IL2P_PAYLOAD_NUMROOTS, &Receiver->RS[1]);
                                     if (Receiver->RXBigBlocks > 0) {
                                         Receiver->RXState = IL2P_RX_BIGBLOCKS;
                                         Receiver->RXBlocksize += 1;
@@ -749,9 +747,9 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                             Receiver->RXBuffer[Receiver->RXBufferIndex++] = Receiver->Work.Byte[3];
                         }
                         Receiver->RXBlockByteCount++;
-                        if (Receiver->RXBlockByteCount == Receiver->RXBlocksize + Receiver->RXNumRoots) {
+                        if (Receiver->RXBlockByteCount == Receiver->RXBlocksize + IL2P_PAYLOAD_NUMROOTS) {
                             // RS Decode this block
-                            x = RSDecode(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlockByteCount, &Receiver->RS[Receiver->RXDecoder]);
+                            x = RSDecode(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlockByteCount, &Receiver->RS[1]);
 
                             if (x >= 0) {
                                 // Decode successful
@@ -760,7 +758,7 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                                 UnScramble(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlocksize * 8, &Receiver->RXLFSR);
                                 Receiver->RXBlockByteCount = 0;
                                 // Back up the output write index to overwrite the parity symbols
-                                Receiver->RXBufferIndex -= Receiver->RXNumRoots;
+                                Receiver->RXBufferIndex -= IL2P_PAYLOAD_NUMROOTS;
                                 Receiver->RXBlockIndex++;
                                 if (Receiver->RXBlockIndex == Receiver->RXBigBlocks) {
                                     if (Receiver->RXBlockIndex == Receiver->RXBlocks) {
@@ -801,9 +799,9 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                             Receiver->RXBuffer[Receiver->RXBufferIndex++] = Receiver->Work.Byte[3];
                         }
                         Receiver->RXBlockByteCount++;
-                        if (Receiver->RXBlockByteCount == Receiver->RXBlocksize + Receiver->RXNumRoots) {
+                        if (Receiver->RXBlockByteCount == Receiver->RXBlocksize + IL2P_PAYLOAD_NUMROOTS) {
                             // RS Decode this block
-                            x = RSDecode(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlockByteCount, &Receiver->RS[Receiver->RXDecoder]);
+                            x = RSDecode(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlockByteCount, &Receiver->RS[1]);
 
                             if (x >= 0) {
                                 // Decode successful
@@ -812,7 +810,7 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                                 UnScramble(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlocksize * 8, &Receiver->RXLFSR);
                                 Receiver->RXBlockByteCount = 0;
                                 // Back up the output write index to overwrite the parity symbols
-                                Receiver->RXBufferIndex -= Receiver->RXNumRoots;
+                                Receiver->RXBufferIndex -= IL2P_PAYLOAD_NUMROOTS;
                                 Receiver->RXBlockIndex++;
                                 if (Receiver->RXBlockIndex == Receiver->RXBlocks) {
                                     // Packet complete

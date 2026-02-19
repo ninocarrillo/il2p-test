@@ -34,15 +34,12 @@
 #define IL2P_RX_HEADER 1
 #define IL2P_RX_BIGBLOCKS 2
 #define IL2P_RX_SMALLBLOCKS 3
-#define IL2P_RX_INTERLEAVE 4
 #define IL2P_RX_PROCESS 5
 #define IL2P_RX_CRC 6
 
-
-#define IL2P_MAXFEC_RS_BLOCKSIZE 239
-#define IL2P_MAXFEC_NUMROOTS 16
-#define IL2P_HEADER_BYTES 15
-#define IL2P_HEADER_BLOCK_SIZE 15
+#define IL2P_MAX_BLOCKSIZE 239
+#define IL2P_PAYLOAD_NUMROOTS 16
+#define IL2P_HEADER_SIZE 15
 #define IL2P_HEADER_NUMROOTS 2
 
 typedef union {
@@ -57,13 +54,11 @@ typedef struct {
     RS2_def_struct RS[2];
     LFSR_struct RXLFSR;
     LFSR_struct TXLFSR;
-    int32_t SignalPower;
-    int32_t NoisePower;
     uint8_t TXBuffer[1125];
     uint8_t RXBuffer[1125];
-    uint16_t RXBufferIndex;
-    int16_t RXState;
-    int16_t RXErrCount;
+    int RXBufferIndex;
+    int RXState;
+    int RXErrCount;
     uint16_t TXHdrPID;
     uint16_t TXHdrCtrl;
     uint16_t TXHdrCount;
@@ -87,33 +82,20 @@ typedef struct {
     uint16_t RXBlocksize;
     uint16_t RXBigBlocks;
     uint16_t RXBlockIndex;
-    uint16_t RXDecoder;
-    uint16_t RXNumRoots;
     uint16_t RXBlockByteCount;
     uint16_t BitIndex;
-    uint16_t RxPktCount;
     uint32_t SisterLastChecksum;
     uint32_t MyLastChecksum;
     int16_t Result;
     uint16_t RxByteCount;
     uint16_t HasNewChecksum;
-    int16_t InterleaveRowIndex;
-    int16_t InterleaveColumnIndex;
-    int16_t InterleaveRSBlockSize;
-    int16_t InterleaveBlockSize;
-    int16_t InterleaveNumroots;
     int16_t MaxPayload;
-    int16_t InterleaveInterval;
     int16_t CRCIndex;
     int16_t SyncTolerance;
     uint16_t TransmitCRC;
     uint16_t ReceiveCRC;
-    uint16_t Synced: 1;
     uint16_t TransparentMode :1;
-    uint16_t MaxFEC :1;
     uint16_t Duplicate :1;
-    uint16_t Interleave :1;
-    uint16_t InterleaveBlockFull :1;
     uint16_t TrailingCRC :1;
     uint16_t FSK4Syncword :1;
     uint16_t InvertRXData :1;
