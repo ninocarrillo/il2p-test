@@ -4,7 +4,7 @@
 #include "kiss.h"
 #include "stdio.h"
 
-void InitIL2P(IL2P_TRX_struct *self){
+void InitIL2P(IL2P_TRX_struct *self) {
     // Save memory by sharing the Galois Field structure between two Reed Solomon structures.
     InitGF2(IL2P_GF_POLY, &self->GF);
     self->RS[0].GF = &self->GF;
@@ -165,7 +165,7 @@ uint16_t PIDtoIL2P(uint16_t AX25PID) {
 }
 
 
-int16_t IL2PHeaderInstallSync(uint8_t *output) {
+int IL2PHeaderInstallSync(uint8_t *output) {
     uint32_t x;
     x = IL2P_SYNCWORD;
     for (int i = 0; i < IL2P_SYNCWORD_LENGTH; i++) {
@@ -174,7 +174,8 @@ int16_t IL2PHeaderInstallSync(uint8_t *output) {
     }
     return 3;
 }
-int16_t IL2PHeaderInstallSpecialSync(uint8_t *output) {
+
+int IL2PHeaderInstallSpecialSync(uint8_t *output) {
     uint32_t x;
     x = 0x77775D;
     //x = 0x55FDDD;
@@ -861,9 +862,8 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
 }
 
 void IL2PConvertToAX25(IL2P_TRX_struct *Receiver) {
-    int16_t i;
     // Install callsigns:
-    for (i = 0; i < 6; i++) {
+    for (int i = 0; i < 6; i++) {
         Receiver->RXBuffer[i] = Receiver->RXDestCall[i] << 1;
         Receiver->RXBuffer[i + 7] = Receiver->RXSrcCall[i] << 1;
     }
