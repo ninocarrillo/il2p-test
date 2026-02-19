@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include "il2p.h"
 #include "kiss.h"
 #include "kiss-frame-handlers.h"
@@ -84,8 +85,8 @@ int main(int arg_count, char* arg_values[]) {
 	
 	if (arg_count < 9) {
 		printf("Not enough arguments.\r\n");
-		printf("Usage:\r\nil2p-test <header restriction> <sync tolerance> <payload length> <low ber> <high ber> <ber interval> <runs> <seed>\r\n");
-		printf("\r\nExample: il2p-test 0 0 1 1e-4 1e-3 1e-4 1000000 0");
+		printf("Usage:\r\nil2p-test <header restriction> <sync tolerance> <payload length> <low ber> <high ber> <steps> <runs> <seed>\r\n");
+		printf("\r\nExample: il2p-test 0 0 1 1e-4 1e-3 10 1000000 0");
 		printf("\r\n\n     header restricion:");
 		printf("\r\n              0 - No restriction (equal distribution of translatable and non-translatable headers. (slow)");
 		printf("\r\n              1 - Only random translatable headers. (slow)");
@@ -100,8 +101,8 @@ int main(int arg_count, char* arg_values[]) {
 		printf("\r\n              Float number, starting bit error rate for trials.");
 		printf("\r\n\n     high ber:");
 		printf("\r\n              Float number, ending bit error rate for trials.");
-		printf("\r\n\n     ber interval:");
-		printf("\r\n              Float number, bit error rate increase interval between trial batches.");
+		printf("\r\n\n     steps:");
+		printf("\r\n              Integer number of bit error rate sample steps, exponentially distributed.");
 		printf("\r\n\n     runs:");
 		printf("\r\n              Integer number of random test cases to perform at each error count. The program");
 		printf("\r\n              will generate a random packet of specified length for each run, and corrupt");
@@ -118,7 +119,7 @@ int main(int arg_count, char* arg_values[]) {
 	int payload_length = atoi(arg_values[3]);
 	float low_ber = atof(arg_values[4]);
 	float high_ber = atof(arg_values[5]);
-	float ber_interval = atof(arg_values[6]);
+	int steps = atoi(arg_values[6]);
 	int run_count = atoi(arg_values[7]);
 	int seed = atoi(arg_values[8]);
 	srand(seed);
@@ -154,8 +155,8 @@ int main(int arg_count, char* arg_values[]) {
 		return(-1);
 	}
 
-	if (ber_interval <= 0) {
-		printf("BER interval %f is too small. Must be greater than zero.", ber_interval);
+	if (steps <= 0) {
+		printf("Step count %i is too small. Must be greater than zero.", steps);
 		return(-1);
 	}
 
@@ -195,12 +196,13 @@ int main(int arg_count, char* arg_values[]) {
 		actual_bit_error_record[i] = 0;
 	}
 
-	int ber_count = ((high_ber - low_ber) / ber_interval) + 2;
+	float ber_base = pow(high_ber/low_ber, 1/(float)(steps-1));
+	//printf("\r\n BER step base: %f", ber_base);
 
-	printf("\r\nStarting %i trials.", ber_count * run_count);
+	printf("\r\nStarting %i trials.", steps * run_count);
 	int master_count = 1;
 	int prog_bar_segs = 40;
-	int print_interval = (ber_count * run_count) / prog_bar_segs;
+	int print_interval = (steps * run_count) / prog_bar_segs;
 	printf("\r\n");
 	for (int i = 0; i <= prog_bar_segs; i++) {
 		printf(" ");
@@ -209,7 +211,7 @@ int main(int arg_count, char* arg_values[]) {
 
 	float ber = low_ber;
 	
-	for (int ber_index = 0; ber_index < ber_count; ber_index++) {
+	for (int ber_index = 0; ber_index < steps; ber_index++) {
 		int bit_error_sum = 0;
 		int bit_sum = 0;
 		for (int run_number = 1; run_number <= run_count; run_number++) {
@@ -343,40 +345,40 @@ int main(int arg_count, char* arg_values[]) {
 		}
 		ber_record[ber_index] = ber;
 		actual_bit_error_record[ber_index] = (float)bit_error_sum / (float)bit_sum;
-		ber += ber_interval;
+		ber *= ber_base;
 	}
 
 
 	printf("\r\nDecode Success by BER:");
-	for (int i = 0; i < ber_count; i++) {
+	for (int i = 0; i < steps; i++) {
 		printf("\r\n%3.3e, %i", ber_record[i], actual_successes[i]);
 	}
 	printf("\r\nDecoder Indicated Success by BER:");
-	for (int i = 0; i < ber_count; i++) {
+	for (int i = 0; i < steps; i++) {
 		printf("\r\n%3.3e, %i", ber_record[i], decoder_accept[i]);
 	}
 	printf("\r\nDecoder Rejected for Header by BER:");
-	for (int i = 0; i < ber_count; i++) {
+	for (int i = 0; i < steps; i++) {
 		printf("\r\n%3.3e, %i", ber_record[i], decoder_reject_header[i]);
 	}
 	printf("\r\nDecoder Rejected for Payload by BER:");
-	for (int i = 0; i < ber_count; i++) {
+	for (int i = 0; i < steps; i++) {
 		printf("\r\n%3.3e, %i", ber_record[i], decoder_reject_payload[i]);
 	}
 	printf("\r\nDecoder Rejected for CRC by BER:");
-	for (int i = 0; i < ber_count; i++) {
+	for (int i = 0; i < steps; i++) {
 		printf("\r\n%3.3e, %i", ber_record[i], decoder_reject_crc[i]);
 	}
 	printf("\r\nDecoder Detection Failures by BER:");
-	for (int i = 0; i < ber_count; i++) {
+	for (int i = 0; i < steps; i++) {
 		printf("\r\n%3.3e, %i", ber_record[i], decoder_no_detect[i]);
 	}
 	printf("\r\nUndetected Failures by BER:");
-	for (int i = 0; i < ber_count; i++) {
+	for (int i = 0; i < steps; i++) {
 		printf("\r\n%3.3e, %i", ber_record[i], undetected_failures[i]);
 	}
 	printf("\r\nBER requested, actual: ");
-	for (int i = 0; i < ber_count; i++) {
+	for (int i = 0; i < steps; i++) {
 		printf("\r\n%3.3e, %3.3e", ber_record[i], actual_bit_error_record[i]);
 	}
 
