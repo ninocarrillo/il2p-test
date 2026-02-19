@@ -24,7 +24,7 @@ void InitIL2P(IL2P_TRX_struct *self){
     self->SyncTolerance = 0;
     self->InvertRXData = 0;
     self->TrailingCRC = 1;
-    self->SisterLastChecksum = -1;
+    self->ExcludeChecksum = -1;
 }
 
 
@@ -535,7 +535,7 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
 
 #define IL2P_CHECK_AND_SEND\
     Receiver->MyLastChecksum = CCITT16CalcCRC(Receiver->RXBuffer, Receiver->RXBufferIndex);\
-    if ((uint32_t)Receiver->MyLastChecksum != Receiver->SisterLastChecksum) {\
+    if ((uint32_t)Receiver->MyLastChecksum != Receiver->ExcludeChecksum) {\
         Receiver->HasNewChecksum = 1;\
         Receiver->Result = 1;\
         for (int i = 0; i < Receiver->RXBufferIndex; i++) {\
@@ -558,24 +558,17 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
     }
 
 void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_count, uint8_t *output_buffer) {
-    int i, j;
-    uint16_t input_data;
-    uint16_t k = 0;
-    int x;
-
-    
     Receiver->Result = 0; 
     // Results:
-    //         0: No packet detected
-    //         1: Valid packet detected
+    //          0: No packet detected
+    //          1: Valid packet detected
     //         -1: Packet rejected for header error
     //         -2: Packet rejected for BigBlock payload error
     //         -3: Packet rejected for SmallBlock payload error
     //         -4: Packet rejected for CRC error
-    for (i = 0; i < input_count; i++) { // step through each input word
-        input_data = input_buffer[i];
-        for (j = 0; j < 8; j++) { //step through each bit, MSB first
-            k++;
+    for (int i = 0; i < input_count; i++) { // step through each input word
+        int input_data = input_buffer[i];
+        for (int j = 0; j < 8; j++) { //step through each bit, MSB first
             switch (Receiver->RXState) {
                 case IL2P_RX_SEARCH:
                     
@@ -616,7 +609,7 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                         }
                         if (Receiver->RXBufferIndex == IL2P_HEADER_SIZE) {
                             // RS Decode header
-                            x = RSDecode(Receiver->RXBuffer, IL2P_HEADER_SIZE, &Receiver->RS[0]);
+                            int x = RSDecode(Receiver->RXBuffer, IL2P_HEADER_SIZE, &Receiver->RS[0]);
                             Receiver->RXBufferIndex -= IL2P_HEADER_NUMROOTS;
                             
                             if (x >= 0) { // Decode successful
@@ -699,16 +692,12 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
 
 
                                 if (Receiver->RXHdrCount > 0) {
-
                                     // This packet contains data
-
-                                            // MaxFEC header
-                                            Receiver->RXBlocks = Ceiling(Receiver->RXHdrCount, IL2P_MAX_BLOCKSIZE);
-                                            Receiver->RXBlocksize = Receiver->RXHdrCount / Receiver->RXBlocks;
-                                            Receiver->RXBigBlocks = Receiver->RXHdrCount - (Receiver->RXBlocks * Receiver->RXBlocksize);
-                                            Receiver->RXBlockIndex = 0;
-                                            Receiver->RXBlockByteCount = 0;
-                                    InitRS2(0, IL2P_PAYLOAD_NUMROOTS, &Receiver->RS[1]);
+                                    Receiver->RXBlocks = Ceiling(Receiver->RXHdrCount, IL2P_MAX_BLOCKSIZE);
+                                    Receiver->RXBlocksize = Receiver->RXHdrCount / Receiver->RXBlocks;
+                                    Receiver->RXBigBlocks = Receiver->RXHdrCount - (Receiver->RXBlocks * Receiver->RXBlocksize);
+                                    Receiver->RXBlockIndex = 0;
+                                    Receiver->RXBlockByteCount = 0;
                                     if (Receiver->RXBigBlocks > 0) {
                                         Receiver->RXState = IL2P_RX_BIGBLOCKS;
                                         Receiver->RXBlocksize += 1;
@@ -749,7 +738,7 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                         Receiver->RXBlockByteCount++;
                         if (Receiver->RXBlockByteCount == Receiver->RXBlocksize + IL2P_PAYLOAD_NUMROOTS) {
                             // RS Decode this block
-                            x = RSDecode(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlockByteCount, &Receiver->RS[1]);
+                            int x = RSDecode(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlockByteCount, &Receiver->RS[1]);
 
                             if (x >= 0) {
                                 // Decode successful
@@ -801,7 +790,7 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                         Receiver->RXBlockByteCount++;
                         if (Receiver->RXBlockByteCount == Receiver->RXBlocksize + IL2P_PAYLOAD_NUMROOTS) {
                             // RS Decode this block
-                            x = RSDecode(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlockByteCount, &Receiver->RS[1]);
+                            int x = RSDecode(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlockByteCount, &Receiver->RS[1]);
 
                             if (x >= 0) {
                                 // Decode successful
@@ -846,7 +835,7 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                         if (Receiver->CRCIndex == 4) {
                             Receiver->RXState = IL2P_RX_SEARCH;
                             Receiver->MyLastChecksum = CCITT16CalcCRC(Receiver->RXBuffer, Receiver->RXBufferIndex);
-                            if ((uint32_t)Receiver->MyLastChecksum != Receiver->SisterLastChecksum) {
+                            if ((uint32_t)Receiver->MyLastChecksum != Receiver->ExcludeChecksum) {
                                 if (Receiver->ReceiveCRC == (uint16_t)Receiver->MyLastChecksum) {
                                     Receiver->HasNewChecksum = 1;
                                     Receiver->Result = 1;
