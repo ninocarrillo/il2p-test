@@ -27,30 +27,10 @@
 #define INIT_TX_SR_B 0x3F83
 #define APOLY 0x600001
 
-int16_t Scramble16(uint16_t *,
-                    int16_t ,
-                    int16_t ,
-                    LFSR_struct *,
-                    uint16_t ,
-                    uint16_t );
 
-int16_t Scramble8(uint8_t *,
-                    int16_t ,
-                    int16_t ,
-                    LFSR_struct *,
-                    uint16_t ,
-                    uint16_t );
+int Scramble(uint8_t *, int, int, LFSR_struct *, int, int);
 
-void Unscramble16(uint16_t *,
-                    int16_t ,
-                    int16_t ,
-                    LFSR_struct *);
-
-
-
-void Unscramble8(uint8_t *,
-                    int16_t ,
-                    LFSR_struct *);
+void UnScramble(uint8_t *, int, LFSR_struct *);
 
 void InitLFSR(uint32_t, LFSR_struct *);
 

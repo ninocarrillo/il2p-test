@@ -459,7 +459,7 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
     }
     // DC-balance the header through LFSR scrambling
     TRX->TXLFSR.ShiftRegister = IL2P_LFSR_TX_PRE;
-    Scramble8(&TRX->TXBuffer[output_addr], IL2P_HEADER_BYTES * 8, 8, &TRX->TXLFSR, 1, 1);
+    Scramble(&TRX->TXBuffer[output_addr], IL2P_HEADER_BYTES * 8, 8, &TRX->TXLFSR, 1, 1);
 
     // RS encode header with two roots (can correct one symbol error)
     RSEncode(&TRX->TXBuffer[output_addr], 13, &TRX->RS[0]);
@@ -492,7 +492,7 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
 
             // DC-balance block through LFSR scrambling
             TRX->TXLFSR.ShiftRegister = IL2P_LFSR_TX_PRE;
-            Scramble8(&TRX->TXBuffer[blockstart], (smallsize + 1) * 8, 8, &TRX->TXLFSR, 1, 1);
+            Scramble(&TRX->TXBuffer[blockstart], (smallsize + 1) * 8, 8, &TRX->TXLFSR, 1, 1);
 
             // Encode this block
             RSEncode(&TRX->TXBuffer[blockstart], smallsize + 1, &TRX->RS[encoder]);
@@ -508,7 +508,7 @@ int IL2PBuildPacket(KISS_struct *kiss, uint8_t *output, IL2P_TRX_struct *TRX) {
 
             // DC-balance block through LFSR scrambling
             TRX->TXLFSR.ShiftRegister = IL2P_LFSR_TX_PRE;
-            Scramble8(&TRX->TXBuffer[blockstart], smallsize * 8, 8, &TRX->TXLFSR, 1, 1);
+            Scramble(&TRX->TXBuffer[blockstart], smallsize * 8, 8, &TRX->TXLFSR, 1, 1);
 
             // Encode this block
             RSEncode(&TRX->TXBuffer[blockstart], smallsize, &TRX->RS[encoder]);
@@ -623,7 +623,7 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                                 Receiver->RXErrCount += x;
                                 // Unscramble header
                                 Receiver->RXLFSR.ShiftRegister = IL2P_LFSR_RX_PRE;
-                                Unscramble8(Receiver->RXBuffer, IL2P_HEADER_BYTES * 8, &Receiver->RXLFSR);
+                                UnScramble(Receiver->RXBuffer, IL2P_HEADER_BYTES * 8, &Receiver->RXLFSR);
                                 // Extract data from header
 
                                 // Identify type of IL2P header
@@ -757,7 +757,7 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                                 // Decode successful
                                 Receiver->RXErrCount += x;
                                 Receiver->RXLFSR.ShiftRegister = IL2P_LFSR_RX_PRE;
-                                Unscramble8(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlocksize * 8, &Receiver->RXLFSR);
+                                UnScramble(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlocksize * 8, &Receiver->RXLFSR);
                                 Receiver->RXBlockByteCount = 0;
                                 // Back up the output write index to overwrite the parity symbols
                                 Receiver->RXBufferIndex -= Receiver->RXNumRoots;
@@ -809,7 +809,7 @@ void IL2PReceive(IL2P_TRX_struct *Receiver, uint8_t *input_buffer, int input_cou
                                 // Decode successful
                                 Receiver->RXErrCount += x;
                                 Receiver->RXLFSR.ShiftRegister = IL2P_LFSR_RX_PRE;
-                                Unscramble8(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlocksize * 8, &Receiver->RXLFSR);
+                                UnScramble(&Receiver->RXBuffer[Receiver->RXBufferIndex - Receiver->RXBlockByteCount], Receiver->RXBlocksize * 8, &Receiver->RXLFSR);
                                 Receiver->RXBlockByteCount = 0;
                                 // Back up the output write index to overwrite the parity symbols
                                 Receiver->RXBufferIndex -= Receiver->RXNumRoots;
