@@ -6,6 +6,7 @@
 #include "kiss-frame-handlers.h"
 #include "crc.h"
 #include "vector_errors.h"
+#include "ax25.h"
 
 #define MAX_BUFFER 1300
 
@@ -182,6 +183,7 @@ int main(int arg_count, char* arg_values[]) {
 	int ax25_source_packet[MAX_BUFFER];
 	uint8_t il2p_encoded_packet[MAX_BUFFER];
 	uint8_t il2p_decoded_packet[MAX_BUFFER];
+	uint8_t ax25_encoded_packet[MAX_BUFFER];
 	uint8_t corrupt_packet[MAX_BUFFER];
 	int error_vector[MAX_BUFFER];
 
@@ -196,7 +198,7 @@ int main(int arg_count, char* arg_values[]) {
 		actual_bit_error_record[i] = 0;
 	}
 
-	float ber_base = pow(high_ber/low_ber, 1/(float)(steps-1));
+	float ber_base = pow(high_ber/low_ber, 1/(double)(steps-1));
 	//printf("\r\n BER step base: %f", ber_base);
 
 	printf("\r\nStarting %i trials.", steps * run_count);
@@ -258,24 +260,29 @@ int main(int arg_count, char* arg_values[]) {
 			// Create packet payload.
 			kiss.OutputCount += GenRandomBytes(&kiss.Output[kiss.OutputCount], adj_payload_length);
 
-			// printf("\r\nRandom packet generated: ");
-			// for (int i = 0; i < kiss.OutputCount; i++) {
-			// 	printf(" %2x", kiss.Output[i]);
-			// }
+			printf("\r\nRandom packet generated: ");
+			for (int i = 0; i < kiss.OutputCount; i++) {
+				printf(" %2x", kiss.Output[i]);
+			}
 
 			int encode_CRC = CCITT16CalcCRC(kiss.Output, kiss.OutputCount);
 			// printf(" CRC: %4x", encode_CRC);
 			// Perform IL2P Encoding.
-			int il2p_tx_count = 0;
-			il2p_tx_count = IL2PBuildPacket(&kiss, il2p_encoded_packet, &il2p_trx);
+			int il2p_tx_count = IL2PBuildPacket(&kiss, il2p_encoded_packet, &il2p_trx);
+			
+			// Perform AX.25 Encoding.
+			int ax25_tx_bit_count = AX25BuildFrame(kiss.Output, kiss.OutputCount, ax25_encoded_packet, 0);
+			int ax25_tx_byte_count = ax25_tx_bit_count / 8;
+			if (ax25_tx_bit_count - (ax25_tx_byte_count * 8) > 0) {
+				ax25_tx_byte_count++;
+			}
 
-			//printf("\r\nIL2P Packet Size: %i", il2p_tx_count);
-			// printf("\r\nIL2P Encoded Packet: ");
-			// fflush(stdout);
-			// for (int i = 0; i < il2p_tx_count; i++) {
-			// 	printf(" %2x", il2p_encoded_packet[i]);
-
-			// }
+			printf("\r\nAX.25 Packet Bit Count: %i", ax25_tx_bit_count);
+			printf("\r\nAX.25 Encoded Packet: ");
+			fflush(stdout);
+			for (int i = 0; i < ax25_tx_byte_count; i++) {
+				printf(" %2x", ax25_encoded_packet[i]);
+			}
 
 			// Generate an error vector.
 			//GenErrorVector(error_vector, 0xFF, il2p_tx_count, ber_index);
