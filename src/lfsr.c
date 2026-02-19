@@ -1,19 +1,11 @@
 #include "lfsr.h"
 
 void UnScramble(uint8_t *target, int in_bit_count, LFSR_struct *LFSR) {
-    uint32_t output;
-    int i;
+    long int output;
     int j = 0; // Input word index.
     int k = 0; // Input bit-in-word index.
-    uint8_t input;
-
-    if (!LFSR->Initialized) {
-        InitLFSR(LFSR->Polynomial, LFSR);
-    }
-   for (i = 0; i < in_bit_count; i++) {
-        input = target[k] & TGTINMASK8;
-        target[k] <<= 1;
-        if (input) {
+    for (int i = 0; i < in_bit_count; i++) {
+        if (target[k] & TGTINMASK8) {
             LFSR->ShiftRegister ^= LFSR->Polynomial;
         }
         if (LFSR->Invert) {
@@ -21,6 +13,7 @@ void UnScramble(uint8_t *target, int in_bit_count, LFSR_struct *LFSR) {
         } else {
             output = LFSR->ShiftRegister & LFSR->FeedbackMask;
         }
+        target[k] <<= 1;
         if (output) {
             target[k] |= 1;
         }
@@ -37,7 +30,7 @@ void UnScramble(uint8_t *target, int in_bit_count, LFSR_struct *LFSR) {
 
 int Scramble(uint8_t *target, int in_bit_count, int target_width, LFSR_struct *LFSR, int prime, int purge) {
     int SR_save = 0;
-    int feedback, input;
+    long int feedback, input;
     int j = 0; // Input word index.
     int k = 0; // Input bit-in-word index.
     int m = 0; // Output word index.
@@ -121,33 +114,21 @@ int Scramble(uint8_t *target, int in_bit_count, int target_width, LFSR_struct *L
 }
 
 
-void InitLFSR(uint32_t Polynomial, LFSR_struct *LFSR) {
-    int16_t i;
+void InitLFSR(long int Polynomial, LFSR_struct *LFSR) {
     LFSR->Polynomial = Polynomial;
     LFSR->TapCount = 0;
     // Index lowest power taps in lowest order positions.
-    for (i = 0; i < MAXPOWER; i++) {
+    for (int i = 0; i < LFSR_MAXPOWER; i++) {
         if ((LFSR->Polynomial >> i) & 1) {
             LFSR->Tap[LFSR->TapCount++] = i;
         }
     }
-    LFSR->InputMask = (uint32_t)1 << (LFSR->Tap[LFSR->TapCount - 1]);
-    LFSR->OutputMask = (uint32_t)1 << LFSR->Tap[1];
+    LFSR->InputMask = 1 << (LFSR->Tap[LFSR->TapCount - 1]);
+    LFSR->OutputMask = 1 << LFSR->Tap[1];
     LFSR->FeedbackMask = 1;
     LFSR->BitDelay = LFSR->Tap[LFSR->TapCount - 1] - LFSR->Tap[1];
     LFSR->BitsInProgress = 0;
     LFSR->Initialized = 1;
     LFSR->Order = 1 << LFSR->Tap[LFSR->TapCount - 1];
-    LFSR->ShiftRegister = 0xFFFF;
-}
-
-
-void StepLFSR(LFSR_struct *LFSR, int16_t step_count) {
-    for (int i = 0; i < step_count; i++) {
-        LFSR->ShiftRegister |= LFSR->InputMask;
-        if(LFSR->ShiftRegister & LFSR->FeedbackMask) {
-            LFSR->ShiftRegister ^= LFSR->Polynomial;
-        }
-        LFSR->ShiftRegister >>= 1;
-    }
+    LFSR->ShiftRegister = -1;
 }

@@ -13,18 +13,18 @@
 #define MAXTAPS 16
 
 typedef struct {
-    uint32_t ShiftRegister;
-    uint32_t Polynomial;
-    uint32_t FeedbackMask;
-    uint32_t InputMask;
-    uint32_t OutputMask;
-    uint32_t Order;
-    int16_t Tap[MAXTAPS];
-    int16_t TapCount;
-    int16_t BitDelay;
-    int16_t BitsInProgress;
-    uint16_t Initialized :1;
-    uint16_t Invert :1;
+    long int ShiftRegister;
+    long int Polynomial;
+    long int FeedbackMask;
+    long int InputMask;
+    long int OutputMask;
+    int Order;
+    int Tap[MAXTAPS];
+    int TapCount;
+    int BitDelay;
+    int BitsInProgress;
+    unsigned Initialized :1;
+    unsigned Invert :1;
 } LFSR_struct;
 
 #endif	/* LFSR_STRUCT_H */
