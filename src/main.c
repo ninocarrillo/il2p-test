@@ -88,12 +88,12 @@ int main(int arg_count, char* arg_values[]) {
 		printf("Usage:\r\nil2p-test <header restriction> <sync tolerance> <payload length> <low ber> <high ber> <steps> <runs> <seed>\r\n");
 		printf("\r\nExample: il2p-test 0 0 1 1e-4 1e-3 10 1000000 0");
 		printf("\r\n\n     header restricion:");
-		printf("\r\n              0 - No restriction (equal distribution of translatable and non-translatable headers. (slow)");
-		printf("\r\n              1 - Only random translatable headers. (slow)");
-		printf("\r\n              2 - Only random non-translatable headers. (fast)");
-		printf("\r\n              3 - Only random translatable UI headers. (fast)");
+		printf("\r\n              0 - No restriction (equal distribution of translatable and non-translatable headers.");
+		printf("\r\n              1 - Only random translatable headers.");
+		printf("\r\n              2 - Only random non-translatable headers.");
+		printf("\r\n              3 - Only random translatable UI headers.");
 		printf("\r\n\n     sync tolerance:");
-		printf("\r\n              Integer number of bits in error in syncword for decoder match.");
+		printf("\r\n              Integer number of bits in error allowable for syncword match.");
 		printf("\r\n\n     payload length:");
 		printf("\r\n              Integer number representing packet payload byte count. For a header-only packet,");
 		printf("\r\n              set this to 0. Maximum payload length is 1023. ");
@@ -377,7 +377,7 @@ int main(int arg_count, char* arg_values[]) {
 	for (int i = 0; i < steps; i++) {
 		printf("\r\n%3.3e, %i", ber_record[i], undetected_failures[i]);
 	}
-	printf("\r\nBER requested, actual: ");
+	printf("\r\nBER requested, observed: ");
 	for (int i = 0; i < steps; i++) {
 		printf("\r\n%3.3e, %3.3e", ber_record[i], actual_bit_error_record[i]);
 	}

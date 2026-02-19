@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdint.h>
 
 void GenRandomMessage(int *buffer, int mask, int size) {
 	for (int i = 0; i < size; i++) {
