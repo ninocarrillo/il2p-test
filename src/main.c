@@ -83,6 +83,9 @@ int GenRandomHeader(unsigned char *buffer) {
 }
 
 int main(int arg_count, char* arg_values[]) {
+	for (int i = 0; i < arg_count; i++) {
+		printf("%s ", arg_values[i]);
+	}
 	
 	if (arg_count < 9) {
 		printf("Not enough arguments.\r\n");
@@ -216,7 +219,7 @@ int main(int arg_count, char* arg_values[]) {
 
 	printf("\r\nStarting %i trials.", steps * run_count);
 	int master_count = 1;
-	int prog_bar_segs = 40;
+	int prog_bar_segs = 70;
 	int print_interval = (steps * run_count) / prog_bar_segs;
 	printf("\r\n");
 	for (int i = 0; i <= prog_bar_segs; i++) {
@@ -365,52 +368,32 @@ int main(int arg_count, char* arg_values[]) {
 		ber *= ber_base;
 	}
 
+	printf("\r\n\nIL2P+CRC Observations");
+	printf("\r\nTrials at Each Bit Error Rate, %i", run_count);
+	printf("\r\n      BER,  ");
+	printf("Success,  ");
+	printf("Hdr Rej,  ");
+	printf("Pld Rej,  ");
+	printf("CRC Rej,  ");
+	printf("No Dtct,  ");
+	printf("  False");
+	for (int i = 0; i < steps; i++) {
+		printf("\r\n%3.3e,%9i,%9i,%9i,%9i,%9i,%9i", ber_record[i], il2p_success[i], il2p_reject_header[i], il2p_reject_payload[i], il2p_reject_crc[i], il2p_no_detect[i], il2p_undetected[i]);
+	}
 
-	printf("\r\nIL2P Success by BER:");
+	printf("\r\n\nAX.25 Observations");
+	printf("\r\nTrials at Each Bit Error Rate, %i", run_count);
+	printf("\r\n      BER,  ");
+	printf("Success,  ");
+	printf("No Dtct,  ");
+	printf("  False");
 	for (int i = 0; i < steps; i++) {
-		printf("\r\n%3.3e, %i", ber_record[i], il2p_success[i]);
+		printf("\r\n%3.3e,%9i,%9i,%9i", ber_record[i], ax25_success[i], ax25_no_detect[i], ax25_undetected[i]);
 	}
-	printf("\r\nAX25 Success by BER:");
-	for (int i = 0; i < steps; i++) {
-		printf("\r\n%3.3e, %i", ber_record[i], ax25_success[i]);
-	}
-	printf("\r\nIL2P Indicated Success by BER:");
-	for (int i = 0; i < steps; i++) {
-		printf("\r\n%3.3e, %i", ber_record[i], il2p_accept[i]);
-	}
-	printf("\r\nAX25 Indicated Success by BER:");
-	for (int i = 0; i < steps; i++) {
-		printf("\r\n%3.3e, %i", ber_record[i], ax25_accept[i]);
-	}
-	printf("\r\nIL2P Rejected for Header by BER:");
-	for (int i = 0; i < steps; i++) {
-		printf("\r\n%3.3e, %i", ber_record[i], il2p_reject_header[i]);
-	}
-	printf("\r\nIL2P Rejected for Payload by BER:");
-	for (int i = 0; i < steps; i++) {
-		printf("\r\n%3.3e, %i", ber_record[i], il2p_reject_payload[i]);
-	}
-	printf("\r\nIL2P Rejected for CRC by BER:");
-	for (int i = 0; i < steps; i++) {
-		printf("\r\n%3.3e, %i", ber_record[i], il2p_reject_crc[i]);
-	}
-	printf("\r\nIL2P Detection Failures by BER:");
-	for (int i = 0; i < steps; i++) {
-		printf("\r\n%3.3e, %i", ber_record[i], il2p_no_detect[i]);
-	}
-	printf("\r\nAX25 Detection Failures by BER:");
-	for (int i = 0; i < steps; i++) {
-		printf("\r\n%3.3e, %i", ber_record[i], ax25_no_detect[i]);
-	}
-	printf("\r\nIL2P Undetected Failures by BER:");
-	for (int i = 0; i < steps; i++) {
-		printf("\r\n%3.3e, %i", ber_record[i], il2p_undetected[i]);
-	}
-	printf("\r\nAX25 Undetected Failures by BER:");
-	for (int i = 0; i < steps; i++) {
-		printf("\r\n%3.3e, %i", ber_record[i], ax25_undetected[i]);
-	}
-	printf("\r\nBER requested, observed: ");
+
+	printf("\r\n\nMeasured Bit Error Rates");
+	printf("\r\n  Tgt BER,  ");
+	printf("Meas BER");
 	for (int i = 0; i < steps; i++) {
 		printf("\r\n%3.3e, %3.3e", ber_record[i], actual_bit_error_record[i]);
 	}
