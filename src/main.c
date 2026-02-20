@@ -398,6 +398,10 @@ int main(int arg_count, char* arg_values[]) {
 	for (int i = 0; i < steps; i++) {
 		printf("\r\n%3.3e, %i", ber_record[i], il2p_no_detect[i]);
 	}
+	printf("\r\nAX25 Detection Failures by BER:");
+	for (int i = 0; i < steps; i++) {
+		printf("\r\n%3.3e, %i", ber_record[i], ax25_no_detect[i]);
+	}
 	printf("\r\nIL2P Undetected Failures by BER:");
 	for (int i = 0; i < steps; i++) {
 		printf("\r\n%3.3e, %i", ber_record[i], il2p_undetected[i]);
