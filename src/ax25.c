@@ -5,7 +5,8 @@ void InitAX25(AX25_Receiver_struct *Receiver) {
     Receiver->BitIndex = 0;
     Receiver->OneCounter = 0;
     Receiver->WordIndex = 0;
-    Receiver->CRCOK = 0;
+    Receiver->Result = 0;
+    Receiver->ExcludeChecksum = -1;
 }
 
 int AX25BuildFrame(uint8_t *input, int in_count, uint8_t *output, int bit_offset) {
@@ -18,21 +19,21 @@ int AX25BuildFrame(uint8_t *input, int in_count, uint8_t *output, int bit_offset
     int bit_counter = bit_offset;
     int output_index = 0;
     if (bit_counter > 0) {
-        output[output_index] >>= (AX25_OUTPUT_WORD_WIDTH - bit_counter);
+        output[output_index] >>= (AX25_TX_OUTPUT_WORD_WIDTH - bit_counter);
     }
     // append start flag
     int bits_remaining = AX25_START_FLAG_BITS;
-    AX25_WORKING_WORD_TYPE working_word = AX25_START_FLAG;
-    working_word <<= (AX25_WORKING_WORD_WIDTH - AX25_START_FLAG_BITS);
+    AX25_TX_WORKING_WORD_TYPE working_word = AX25_START_FLAG;
+    working_word <<= (AX25_TX_WORKING_WORD_WIDTH - AX25_START_FLAG_BITS);
     while (bits_remaining--) {
         out_count++;
         output[output_index] <<= 1;
-        if (working_word & AX25_WORKING_WORD_MASK) {
+        if (working_word & AX25_TX_WORKING_WORD_MASK) {
             output[output_index] |= 1;
         }
         working_word <<= 1;
         bit_counter++;
-        if (bit_counter >= AX25_OUTPUT_WORD_WIDTH) {
+        if (bit_counter > (AX25_TX_OUTPUT_WORD_WIDTH-1)) {
             bit_counter = 0;
             output_index++;
             output[output_index] = 0;
@@ -65,7 +66,7 @@ int AX25BuildFrame(uint8_t *input, int in_count, uint8_t *output, int bit_offset
                 }
             }
             bit_counter++; // count output bit in word
-            if (bit_counter >= AX25_OUTPUT_WORD_WIDTH) {
+            if (bit_counter > (AX25_TX_OUTPUT_WORD_WIDTH-1)) {
                 bit_counter = 0;
                 output_index++;
                 output[output_index] = 0;
@@ -82,7 +83,7 @@ int AX25BuildFrame(uint8_t *input, int in_count, uint8_t *output, int bit_offset
 		output[output_index] <<= 1;
 		out_count++;
 		bit_counter++; // count output bit in word
-		if (bit_counter >= AX25_OUTPUT_WORD_WIDTH) {
+		if (bit_counter > (AX25_TX_OUTPUT_WORD_WIDTH-1)) {
 			bit_counter = 0;
 			output_index++;
             output[output_index] = 0;
@@ -98,7 +99,7 @@ int AX25BuildFrame(uint8_t *input, int in_count, uint8_t *output, int bit_offset
         output[output_index] |= working_word & 1;
         working_word >>= 1;
         bit_counter++;
-        if (bit_counter > AX25_OUTPUT_WORD_WIDTH) {
+        if (bit_counter > (AX25_TX_OUTPUT_WORD_WIDTH-1)) {
             bit_counter = 0;
             output_index++;
             output[output_index] = 0;
@@ -107,87 +108,82 @@ int AX25BuildFrame(uint8_t *input, int in_count, uint8_t *output, int bit_offset
     
     // align final word to msb
     if (bit_counter > 0) {
-        output[output_index] <<= (AX25_OUTPUT_WORD_WIDTH - bit_counter);
+        output[output_index] <<= (AX25_TX_OUTPUT_WORD_WIDTH - bit_counter);
     }
     return out_count; // Returns bits in assembled AX.25 frame.
 }
 
-// void AX25Receivetooutput_indexISS(AX25_Receiver_struct *Receiver, UInt16_Buffer_struct *Input, UART_struct *UART) {
-    // int16_t i, j;
-    // for (i = 0; i < Input->WordCount; i++) { // step through each input word
-        // for (j = 0; j < 16; j++) { //step through each bit, MSB first
-            /*bit un-stuff*/
-            // if (Input->StartAddr[i] & 0x8000) { // one bit
-                // Receiver->Woroutput_indexingWord8 |= 0x80;
-                // Receiver->OneCounter++;
-                // Receiver->BitIndex++;
-                // if (Receiver->OneCounter > 6){
-                    /*abort frame for invalid bit sequence*/
-                    // Receiver->BitIndex = 0;
-                    // Receiver->WordIndex = 0;
-                // } else if (Receiver->BitIndex > 7) { // 8 valid bits received, record byte
-                    // Receiver->BitIndex = 0;
-                    // Receiver->Buffer[Receiver->WordIndex] = Receiver->Woroutput_indexingWord8;
-                    // Receiver->WordIndex++;
-                    // if (Receiver->WordIndex >= AX25_MAX_RX_BUFFER) {
-                        /*Frame exceeds size of buffer*/
-                        // Receiver->WordIndex = 0;
-                        // Receiver->OneCounter = 0;
-                    // }                        
-                // } else {
-                    // Receiver->Woroutput_indexingWord8 >>= 1;
-                // }                    
-            // } else { //zero bit
-                // if (Receiver->OneCounter < 5) {
-                    // Receiver->Woroutput_indexingWord8 &= 0x7F;
-                    // Receiver->BitIndex++;
-                    // if (Receiver->BitIndex > 7) {
-                        // Receiver->BitIndex = 0;
-                        // Receiver->Buffer[Receiver->WordIndex] = Receiver->Woroutput_indexingWord8;
-                        // Receiver->WordIndex++;
-                        // if (Receiver->WordIndex >= AX25_MAX_RX_BUFFER) {
-                            /*Frame exceeds size of buffer*/
-                            // Receiver->WordIndex = 0;
-                        // }
-                    // } else {
-                        // Receiver->Woroutput_indexingWord8 >>= 1;
-                    // }
-                // } else if (Receiver->OneCounter == 5) {
-                    /*ignore stuffed zero*/
-                // } else if (Receiver->OneCounter == 6) { // Flag frame end
-                    // if ((Receiver->WordIndex >= MIN_AX25_FRAME_LENGTH) && (Receiver->BitIndex == 7)) {
 
-                            // Receiver->WordIndex -= 2;
-                            // if (CCITT16Checoutput_indexCRC(Receiver->Buffer, Receiver->WordIndex)) {
-                                // Receiver->CRC = (uint16_t)Receiver->Buffer[Receiver->WordIndex];
-                                // Receiver->CRC |= ((uint16_t)Receiver->Buffer[Receiver->WordIndex + 1]) << 8;
-                                // Receiver->CRCOoutput_index = 1;
-                                // if (Receiver->CRC != Receiver->SisterCRC) {
-                                    // Sendoutput_indexISS(UART, 0, 0, Receiver->Buffer, Receiver->WordIndex);
-                                    // Receiver->Duplicate = 0;
-                                    // Receiver->RxByteCount = Receiver->WordIndex;
-                                    // int16_t i;
-                                    // for (i = 0; i < 7; i++) {
-                                        // Receiver->LastHeardDestCallsign[i] = Receiver->Buffer[i];
-                                    // }
-                                // } else {
-                                    // Receiver->Duplicate = 1;
-                                // }
+int AX25Receive(AX25_Receiver_struct *Receiver, uint8_t *input, int input_count, uint8_t *output) {
+    Receiver->Result = 0;
+    int return_byte_count = 0;
+    for (int input_index = 0; input_index < input_count; input_index++) { // step through each input word
+        for (int bit_index = 0; bit_index < AX25_RX_INPUT_WORD_WIDTH; bit_index++) { //step through each bit, MSB first
+            // bit un-stuff
+            if (input[input_index] & AX25_RX_INPUT_WORD_MASK) { // one bit
+                Receiver->WorkingWord8 |= 0x80;
+                Receiver->OneCounter++;
+                Receiver->BitIndex++;
+                if (Receiver->OneCounter > 6){
+                    // abort frame for invalid bit sequence
+                    //Receiver->OneCounter = 0; // Commenting this line out allows invalid 0xFE frame start flag.
+                    Receiver->BitIndex = 0;
+                    Receiver->WordIndex = 0;
+                } else if (Receiver->BitIndex > 7) { // 8 valid bits received, record byte
+                    Receiver->BitIndex = 0;
+                    Receiver->Buffer[Receiver->WordIndex] = Receiver->WorkingWord8;
+                    Receiver->WordIndex++;
+                    if (Receiver->WordIndex >= AX25_MAX_RX_BUFFER) {
+                        // Frame exceeds size of buffer
+                        Receiver->WordIndex = 0;
+                        Receiver->OneCounter = 0;
+                    }                        
+                } else {
+                    Receiver->WorkingWord8 >>= 1;
+                }                    
+            } else { //zero bit
+                if (Receiver->OneCounter < 5) {
+                    Receiver->WorkingWord8 &= 0x7F;
+                    Receiver->BitIndex++;
+                    if (Receiver->BitIndex > 7) {
+                        Receiver->BitIndex = 0;
+                        Receiver->Buffer[Receiver->WordIndex] = Receiver->WorkingWord8;
+                        Receiver->WordIndex++;
+                        if (Receiver->WordIndex >= AX25_MAX_RX_BUFFER) {
+                            // Frame exceeds size of buffer
+                            Receiver->WordIndex = 0;
+                        }
+                    } else {
+                        Receiver->WorkingWord8 >>= 1;
+                    }
+                } else if (Receiver->OneCounter == 5) {
+                    // ignore stuffed zero
+                } else if (Receiver->OneCounter == 6) { // Flag frame end
+                    if ((Receiver->WordIndex >= MIN_AX25_FRAME_LENGTH) && (Receiver->BitIndex == 7)) {
+                            Receiver->WordIndex -= 2;
+                            if (CCITT16CheckCRC(Receiver->Buffer, Receiver->WordIndex)) {
+                                Receiver->CRC = (uint16_t)Receiver->Buffer[Receiver->WordIndex];
+                                Receiver->CRC |= ((uint16_t)Receiver->Buffer[Receiver->WordIndex + 1]) << 8;
+                                if (Receiver->CRC != Receiver->ExcludeChecksum) {
+                                    Receiver->Result = 1;
+                                    for (int i = 0; i < Receiver->WordIndex; i++) {
+                                        output[i] = Receiver->Buffer[i];
+                                    }
+                                    return_byte_count = Receiver->WordIndex;
+                                } 
+                            }
+                    }
+                    Receiver->WordIndex = 0;
+                    Receiver->BitIndex = 0;
+                } else { // one counter > 6, therefore frame is invalid
+                    Receiver->WordIndex = 0;
+                    Receiver->BitIndex = 0;
+                }
+                Receiver->OneCounter = 0;
+            }
+            input[input_index] <<= 1;
+        }
+    } 
+    return return_byte_count;
+}
 
-                            // } else {
-                                // Receiver->CRCBad = 1;
-                            // }
-
-                    // }
-                    // Receiver->WordIndex = 0;
-                    // Receiver->BitIndex = 0;
-                // } else { // one counter > 6, therefore frame is invalid
-                    // Receiver->WordIndex = 0;
-                    // Receiver->BitIndex = 0;
-                // }
-                // Receiver->OneCounter = 0;
-            // }
-            // Input->StartAddr[i] <<= 1;
-        // }
-    // } 
-// }
