@@ -231,6 +231,7 @@ int main(int arg_count, char* arg_values[]) {
 		printf(" ");
 	}
 	printf("]\r[");
+	fflush(stdout);
 
 	double ber = low_ber;
 	
