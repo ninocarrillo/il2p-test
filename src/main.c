@@ -144,8 +144,8 @@ int main(int arg_count, char* arg_values[]) {
 		return(-1);
 	}
 
-	if (low_ber < 0) {
-		printf("Low BER %f is too small. Must be at least zero.", low_ber);
+	if (low_ber <= 0) {
+		printf("Low BER %f is too small. Must be greater than zero.", low_ber);
 		return(-1);
 	}
 
