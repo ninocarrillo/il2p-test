@@ -121,8 +121,8 @@ int main(int arg_count, char* arg_values[]) {
 	int header_restriction = atoi(arg_values[1]);
 	int sync_tolerance = atoi(arg_values[2]);
 	int payload_length = atoi(arg_values[3]);
-	float low_ber = atof(arg_values[4]);
-	float high_ber = atof(arg_values[5]);
+	double low_ber = atof(arg_values[4]);
+	double high_ber = atof(arg_values[5]);
 	int steps = atoi(arg_values[6]);
 	int run_count = atoi(arg_values[7]);
 	int seed = atoi(arg_values[8]);
@@ -164,6 +164,11 @@ int main(int arg_count, char* arg_values[]) {
 		return(-1);
 	}
 
+	if (run_count > 999999999) {
+		printf("Run count %i is too large. Must be less than 1 billion.", run_count);
+		return(-1);
+	}
+
 	
 
 	IL2P_TRX_struct il2p_trx;
@@ -186,8 +191,8 @@ int main(int arg_count, char* arg_values[]) {
 	int ax25_accept[MAX_BUFFER];
 	int ax25_success[MAX_BUFFER];
 	int ax25_undetected[MAX_BUFFER];
-	float ber_record[MAX_BUFFER];
-	float actual_bit_error_record[MAX_BUFFER];
+	double ber_record[MAX_BUFFER];
+	double actual_bit_error_record[MAX_BUFFER];
 
 	for (int i = 0; i <= MAX_BUFFER; i++) {
 		il2p_reject_header[i] = 0;
@@ -214,26 +219,26 @@ int main(int arg_count, char* arg_values[]) {
 	int il2p_error_vector[MAX_BUFFER];
 	int ax25_error_vector[MAX_BUFFER];
 
-	float ber_base = pow(high_ber/low_ber, 1/(double)(steps-1));
+	double ber_base = pow(high_ber/low_ber, 1/(double)(steps-1));
 	//printf("\r\n BER step base: %f", ber_base);
 
-	printf("\r\nStarting %i trials.", steps * run_count);
-	int master_count = 1;
+	printf("\r\nStarting %li trials.", (long int)steps * (long int)run_count);
+	long int master_count = 1;
 	int prog_bar_segs = 70;
-	int print_interval = (steps * run_count) / prog_bar_segs;
+	long int print_interval = ((long int)steps * (long int)run_count) / (long int)prog_bar_segs;
 	printf("\r\n");
 	for (int i = 0; i <= prog_bar_segs; i++) {
 		printf(" ");
 	}
 	printf("]\r[");
 
-	float ber = low_ber;
+	double ber = low_ber;
 	
 	for (int ber_index = 0; ber_index < steps; ber_index++) {
-		int bit_error_sum = 0;
-		int bit_sum = 0;
+		long int bit_error_sum = 0;
+		long int bit_sum = 0;
 		for (int run_number = 1; run_number <= run_count; run_number++) {
-			if ((master_count++ % print_interval) == 0 ) {
+			if ((master_count++ % (long int)print_interval) == 0 ) {
 				printf("=");
 				fflush(stdout);
 			}
@@ -364,7 +369,7 @@ int main(int arg_count, char* arg_values[]) {
 		
 		}
 		ber_record[ber_index] = ber;
-		actual_bit_error_record[ber_index] = (float)bit_error_sum / (float)bit_sum;
+		actual_bit_error_record[ber_index] = (double)bit_error_sum / (double)bit_sum;
 		ber *= ber_base;
 	}
 

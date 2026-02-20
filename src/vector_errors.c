@@ -12,7 +12,7 @@ void CopyMessage(int *in, int *out, int size) {
 	}
 }
 
-int GenBERErrorVector(int *buffer, int bits_per_word, int size, float ber) {
+int GenBERErrorVector(int *buffer, int bits_per_word, int size, double ber) {
 	int bit_count = size * bits_per_word;
 	int byte_index = 0;
 	int bit_index = 0;
