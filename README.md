@@ -1,5 +1,5 @@
 # il2p-test
-IL2P encoder and decoder implementations with random error testing. Repository contains example Reed Solomon encoder and decoder, including Galois Field arithmetic functions. IL2P implementation conforms to draft spec 0.6.
+IL2P encoder and decoder implementations with random error testing. Repository contains example Reed Solomon encoder and decoder, including Galois Field arithmetic functions. IL2P implementation conforms to [draft spec 0.6](doc/il2p-specification_draft_v0-6.pdf).
 # Requirements
 gcc or other c compiler stdlib and stdio
 # Compiling with gcc
