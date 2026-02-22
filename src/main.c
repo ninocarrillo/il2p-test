@@ -90,8 +90,8 @@ int main(int arg_count, char* arg_values[]) {
 	if (arg_count < 9) {
 		printf("Not enough arguments.\r\n");
 		printf("Usage:\r\nil2p-test <header restriction> <sync tolerance> <payload length> <low ber> <high ber> <steps> <runs> <seed>\r\n");
-		printf("\r\nExample: il2p-test 0 0 1 1e-4 1e-3 10 1000000 0");
-		printf("\r\n\n     header restricion:");
+		printf("\r\nExample: il2p-test 0 0 50 1e-6 1e-1 10 1000 0");
+		printf("\r\n\n     header restriction:");
 		printf("\r\n              0 - No restriction (equal distribution of translatable and non-translatable headers).");
 		printf("\r\n              1 - Only random translatable headers.");
 		printf("\r\n              2 - Only random non-translatable headers.");
