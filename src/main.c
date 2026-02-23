@@ -333,7 +333,7 @@ int main(int arg_count, char* arg_values[]) {
 			}
 
 			// Generate an error vector.
-			bit_error_sum += GenBERErrorVector(ax25_error_vector, 8, ax25_tx_byte_count, ber);
+			bit_error_sum += GenSERErrorVector(ax25_error_vector, 8, ax25_tx_byte_count, 1, ber);
 			bit_sum += ax25_tx_bit_count;
 
 			// Add noise to AX25 packet.

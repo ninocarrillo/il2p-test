@@ -34,6 +34,33 @@ int GenBERErrorVector(int *buffer, int bits_per_word, int size, double ber) {
 	return bit_error_count;
 }
 
+int GenSERErrorVector(int *buffer, int bits_per_word, int word_count, int bits_per_symbol, double ser) {
+	int symbol_count = (word_count * bits_per_word) / bits_per_symbol;
+	if ((symbol_count * bits_per_symbol) < (word_count * bits_per_word)) {
+		symbol_count++;
+	}
+	int error_pattern = (1<<bits_per_symbol) - 1;
+	int word_mask = (1<<bits_per_word) - 1;
+	int word_index = 0;
+	int bit_index = 0;
+	long int work = 0;
+	int symbol_error_count = 0;
+	for (int i = 0; i < symbol_count; i++) {
+		if (((double)rand() / (double)RAND_MAX) < ser) {
+			work |= error_pattern;
+			symbol_error_count++;
+		}
+		bit_index+= bits_per_symbol;
+		while (bit_index >= bits_per_word) {
+			bit_index -= bits_per_symbol;
+			buffer[word_index++] = (work>>(bit_index - bits_per_word)) & word_mask;
+			work>>= (bit_index - bits_per_word);
+		}
+		work <<= bits_per_symbol;
+	}
+	return symbol_error_count;
+}
+
 void CombineVectors(int *in1, int *in2, int *out, int count) {
 	for (int i = 0; i < count; i++) {
 		out[i] = in1[i] ^ in2[i];
