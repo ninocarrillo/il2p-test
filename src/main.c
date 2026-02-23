@@ -87,32 +87,38 @@ int main(int arg_count, char* arg_values[]) {
 		printf("%s ", arg_values[i]);
 	}
 	
-	if (arg_count < 9) {
+	if (arg_count < 10) {
 		printf("Not enough arguments.\r\n");
-		printf("Usage:\r\nil2p-test <header restriction> <sync tolerance> <payload length> <low ber> <high ber> <steps> <runs> <seed>\r\n");
+		printf("Usage:\r\nil2p-test <header restriction> <sync tolerance> <payload length> <bits per symbol> <low ser> <high ser> <steps> <runs> <seed>\r\n");
 		printf("\r\nExample: il2p-test 0 0 50 1e-6 1e-1 10 1000 0");
 		printf("\r\n\n     header restriction:");
-		printf("\r\n              0 - No restriction (equal distribution of translatable and non-translatable headers).");
+		printf("\r\n              0 - No restriction.");
+		printf("\r\n                  Equally distributed translatable and non-translatable headers.");
 		printf("\r\n              1 - Only random translatable headers.");
 		printf("\r\n              2 - Only random non-translatable headers.");
 		printf("\r\n              3 - Only random translatable UI headers.");
 		printf("\r\n\n     sync tolerance:");
 		printf("\r\n              Integer number of bits in error allowable for syncword match.");
 		printf("\r\n\n     payload length:");
-		printf("\r\n              Integer number representing packet payload byte count. For a header-only packet,");
-		printf("\r\n              set this to 0. Maximum payload length is 1023. ");
-		printf("\r\n\n     low ber:");
-		printf("\r\n              Float number, starting bit error rate for trials.");
-		printf("\r\n\n     high ber:");
-		printf("\r\n              Float number, ending bit error rate for trials.");
+		printf("\r\n              Integer number representing packet payload byte count. For a");
+		printf("\r\n              header-only packet, set this to 0. Maximum payload length is 1023.");
+		printf("\r\n\n     bits per symbol:");
+		printf("\r\n              Integer number of bits per modulator symbol, in the range 1 to 8.");
+		printf("\r\n\n     low ser:");
+		printf("\r\n              Float number, starting symbol error rate for trials.");
+		printf("\r\n\n     high ser:");
+		printf("\r\n              Float number, ending symbol error rate for trials.");
 		printf("\r\n\n     steps:");
-		printf("\r\n              Integer number of bit error rate sample steps, exponentially distributed.");
+		printf("\r\n              Integer number of bit error rate sample steps, exponentially");
+		printf("\r\n              distributed.");
 		printf("\r\n\n     runs:");
-		printf("\r\n              Integer number of random test cases to perform at each error count. The program");
-		printf("\r\n              will generate a random packet of specified length for each run, and corrupt");
-		printf("\r\n              the packet with bit errors according to specified bit error rate.");
+		printf("\r\n              Integer number of random test cases at each error count. The");
+		printf("\r\n              program will generate a random packet of specified length for each");
+		printf("\r\n              run, and corrupt the packet with bit errors according to specified");
+		printf("\r\n              bit error rate.");
 		printf("\r\n\n     seed:");
-		printf("\r\n              Integer number used to seed random number generator, for test repeatability.");
+		printf("\r\n              Integer number used to seed random number generator, for test");
+		printf("\r\n              repeatability.");
 		printf("\r\n");
 
 		return(-1);
@@ -121,11 +127,12 @@ int main(int arg_count, char* arg_values[]) {
 	int header_restriction = atoi(arg_values[1]);
 	int sync_tolerance = atoi(arg_values[2]);
 	int payload_length = atoi(arg_values[3]);
-	double low_ber = atof(arg_values[4]);
-	double high_ber = atof(arg_values[5]);
-	int steps = atoi(arg_values[6]);
-	int run_count = atoi(arg_values[7]);
-	int seed = atoi(arg_values[8]);
+	int bits_per_symbol = atof(arg_values[4]);
+	double low_ser = atof(arg_values[5]);
+	double high_ser = atof(arg_values[6]);
+	int steps = atoi(arg_values[7]);
+	int run_count = atoi(arg_values[8]);
+	int seed = atoi(arg_values[9]);
 	srand(seed);
 	
 	// Validate arguments
@@ -144,18 +151,23 @@ int main(int arg_count, char* arg_values[]) {
 		return(-1);
 	}
 
-	if (low_ber <= 0) {
-		printf("Low BER %f is too small. Must be greater than zero.", low_ber);
+	if (bits_per_symbol < 1) {
+		printf("Bits per symbol %i is too small. Must be greater than zero.\r\n", bits_per_symbol);
 		return(-1);
 	}
 
-	if (high_ber >= 1) {
-		printf("High BER %f is too large. Must be less than 1.", high_ber);
+	if (bits_per_symbol > 8) {
+		printf("Bits per symbol %i is too large. Must be less than 8.\r\n", bits_per_symbol);
 		return(-1);
 	}
 
-	if (high_ber >= 1) {
-		printf("High BER %f is too large. Must be less than 1.", high_ber);
+	if (low_ser <= 0) {
+		printf("Low ser %f is too small. Must be greater than zero.", low_ser);
+		return(-1);
+	}
+
+	if (high_ser >= 1) {
+		printf("High ser %f is too large. Must be less than 1.", high_ser);
 		return(-1);
 	}
 
@@ -191,8 +203,8 @@ int main(int arg_count, char* arg_values[]) {
 	int ax25_accept[MAX_BUFFER];
 	int ax25_success[MAX_BUFFER];
 	int ax25_undetected[MAX_BUFFER];
-	double ber_record[MAX_BUFFER];
-	double actual_bit_error_record[MAX_BUFFER];
+	double tgt_ser_record[MAX_BUFFER];
+	double meas_ser_record[MAX_BUFFER];
 
 	for (int i = 0; i <= MAX_BUFFER; i++) {
 		il2p_reject_header[i] = 0;
@@ -206,7 +218,7 @@ int main(int arg_count, char* arg_values[]) {
 		ax25_accept[i] = 0;
 		ax25_success[i] = 0;
 		ax25_undetected[i] = 0;
-		actual_bit_error_record[i] = 0;
+		meas_ser_record[i] = 0;
 	}
 
 	int ax25_source_packet[MAX_BUFFER];
@@ -219,8 +231,8 @@ int main(int arg_count, char* arg_values[]) {
 	int il2p_error_vector[MAX_BUFFER];
 	int ax25_error_vector[MAX_BUFFER];
 
-	double ber_base = pow(high_ber/low_ber, 1/(double)(steps-1));
-	//printf("\r\n BER step base: %f", ber_base);
+	double ser_base = pow(high_ser/low_ser, 1/(double)(steps-1));
+	//printf("\r\n symbol_error_rate step base: %f", ser_base);
 
 	printf("\r\nStarting %li trials.", (long int)steps * (long int)run_count);
 	long int master_count = 1;
@@ -233,11 +245,11 @@ int main(int arg_count, char* arg_values[]) {
 	printf("]\r[");
 	fflush(stdout);
 
-	double ber = low_ber;
+	double symbol_error_rate = low_ser;
 	
-	for (int ber_index = 0; ber_index < steps; ber_index++) {
-		long int bit_error_sum = 0;
-		long int bit_sum = 0;
+	for (int ser_index = 0; ser_index < steps; ser_index++) {
+		long int symbol_error_sum = 0;
+		long int symbol_sum = 0;
 		for (int run_number = 1; run_number <= run_count; run_number++) {
 			if ((master_count++ % (long int)print_interval) == 0 ) {
 				printf("=");
@@ -281,8 +293,8 @@ int main(int arg_count, char* arg_values[]) {
 			int il2p_tx_count = IL2PBuildPacket(&kiss, il2p_encoded_packet, &il2p_trx);
 
 			// Generate an error vector.
-			bit_error_sum += GenBERErrorVector(il2p_error_vector, 8, il2p_tx_count, ber);
-			bit_sum += il2p_tx_count * 8;
+			symbol_error_sum += GenSERErrorVector(il2p_error_vector, 8, il2p_tx_count, bits_per_symbol, symbol_error_rate);
+			symbol_sum += (il2p_tx_count * 8) / bits_per_symbol;
 
 			// Add noise to IL2P packet.
 			for (int i = 0; i < il2p_tx_count; i++) {
@@ -293,24 +305,24 @@ int main(int arg_count, char* arg_values[]) {
 			switch(il2p_trx.Result) {
 			case 0:
 				// No packet detection.
-				il2p_no_detect[ber_index]++;
+				il2p_no_detect[ser_index]++;
 				break;
 			case 1:
 				// Decoder indicates success
-				il2p_accept[ber_index]++;
+				il2p_accept[ser_index]++;
 				break;
 			case -1:
 				// Decoder indicates header RS decode unsuccessful
-				il2p_reject_header[ber_index]++;
+				il2p_reject_header[ser_index]++;
 				break;
 			case -2:
 			case -3:
 				// Decoder indicates payload decode unsuccessful
-				il2p_reject_payload[ber_index]++;
+				il2p_reject_payload[ser_index]++;
 				break;
 			case -4:
 				// Decoder indicates CRC mismatch
-				il2p_reject_crc[ber_index]++;
+				il2p_reject_crc[ser_index]++;
 			}
 
 			// compare the decoded packet to the original packet
@@ -318,11 +330,11 @@ int main(int arg_count, char* arg_values[]) {
 				// The packets differ.
 				if (il2p_trx.Result > 0) {
 					// But decoder indicated success
-					il2p_undetected[ber_index]++;
+					il2p_undetected[ser_index]++;
 				}
 			} else {
 				// The packets are the same
-				il2p_success[ber_index]++;
+				il2p_success[ser_index]++;
 			}
 			
 			// Perform AX.25 Encoding.
@@ -333,8 +345,8 @@ int main(int arg_count, char* arg_values[]) {
 			}
 
 			// Generate an error vector.
-			bit_error_sum += GenSERErrorVector(ax25_error_vector, 8, ax25_tx_byte_count, 1, ber);
-			bit_sum += ax25_tx_bit_count;
+			symbol_error_sum += GenSERErrorVector(ax25_error_vector, 8, ax25_tx_byte_count, bits_per_symbol, symbol_error_rate);
+			symbol_sum += (ax25_tx_byte_count * 8) / bits_per_symbol;
 
 			// Add noise to AX25 packet.
 			for (int i = 0; i < ax25_tx_byte_count; i++) {
@@ -345,11 +357,11 @@ int main(int arg_count, char* arg_values[]) {
 			switch(ax25_rx.Result) {
 			case 0:
 				// No packet detection
-				ax25_no_detect[ber_index]++;
+				ax25_no_detect[ser_index]++;
 				break;
 			case 1:
 				// Decoder indicates success
-				ax25_accept[ber_index]++;
+				ax25_accept[ser_index]++;
 				break;
 			default:
 				break;
@@ -360,23 +372,23 @@ int main(int arg_count, char* arg_values[]) {
 				// The packets differ.
 				if (ax25_rx.Result > 0) {
 					// But decoder indicated success
-					ax25_undetected[ber_index]++;
+					ax25_undetected[ser_index]++;
 				}
 			} else {
 				// The packets are the same
-				ax25_success[ber_index]++;
+				ax25_success[ser_index]++;
 			}
 
 		
 		}
-		ber_record[ber_index] = ber;
-		actual_bit_error_record[ber_index] = (double)bit_error_sum / (double)bit_sum;
-		ber *= ber_base;
+		tgt_ser_record[ser_index] = symbol_error_rate;
+		meas_ser_record[ser_index] = (double)symbol_error_sum / (double)symbol_sum;
+		symbol_error_rate *= ser_base;
 	}
 
 	printf("\r\n\nIL2P+CRC Observations");
-	printf("\r\nTrials at Each Bit Error Rate, %i", run_count);
-	printf("\r\n      BER,  ");
+	printf("\r\nRuns, %i", run_count);
+	printf("\r\n      SER,  ");
 	printf("Success,  ");
 	printf("Hdr Rej,  ");
 	printf("Pld Rej,  ");
@@ -384,24 +396,25 @@ int main(int arg_count, char* arg_values[]) {
 	printf("No Dtct,  ");
 	printf("  False");
 	for (int i = 0; i < steps; i++) {
-		printf("\r\n%3.3e,%9i,%9i,%9i,%9i,%9i,%9i", ber_record[i], il2p_success[i], il2p_reject_header[i], il2p_reject_payload[i], il2p_reject_crc[i], il2p_no_detect[i], il2p_undetected[i]);
+		printf("\r\n%3.3e,%9i,%9i,%9i,%9i,%9i,%9i", tgt_ser_record[i], il2p_success[i], il2p_reject_header[i], il2p_reject_payload[i], il2p_reject_crc[i], il2p_no_detect[i], il2p_undetected[i]);
 	}
 
 	printf("\r\n\nAX.25 Observations");
-	printf("\r\nTrials at Each Bit Error Rate, %i", run_count);
-	printf("\r\n      BER,  ");
+	printf("\r\nRuns, %i", run_count);
+	printf("\r\n      SER,  ");
 	printf("Success,  ");
 	printf("No Dtct,  ");
 	printf("  False");
 	for (int i = 0; i < steps; i++) {
-		printf("\r\n%3.3e,%9i,%9i,%9i", ber_record[i], ax25_success[i], ax25_no_detect[i], ax25_undetected[i]);
+		printf("\r\n%3.3e,%9i,%9i,%9i", tgt_ser_record[i], ax25_success[i], ax25_no_detect[i], ax25_undetected[i]);
 	}
 
-	printf("\r\n\nMeasured Bit Error Rates");
-	printf("\r\n  Tgt BER,  ");
-	printf("Meas BER");
+	printf("\r\n\nMeasured Symbol Error Rates");
+	printf("\r\nBits Per Symbol, %i", bits_per_symbol);
+	printf("\r\n  Tgt SER,  ");
+	printf("Meas SER");
 	for (int i = 0; i < steps; i++) {
-		printf("\r\n%3.3e, %3.3e", ber_record[i], actual_bit_error_record[i]);
+		printf("\r\n%3.3e, %3.3e", tgt_ser_record[i], meas_ser_record[i]);
 	}
 
 	printf("\r\nDone.\r\n");

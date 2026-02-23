@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
 
 void GenRandomMessage(int *buffer, int mask, int size) {
 	for (int i = 0; i < size; i++) {
@@ -52,9 +53,9 @@ int GenSERErrorVector(int *buffer, int bits_per_word, int word_count, int bits_p
 		}
 		bit_index+= bits_per_symbol;
 		while (bit_index >= bits_per_word) {
-			bit_index -= bits_per_symbol;
 			buffer[word_index++] = (work>>(bit_index - bits_per_word)) & word_mask;
 			work>>= (bit_index - bits_per_word);
+			bit_index -= bits_per_word;
 		}
 		work <<= bits_per_symbol;
 	}
