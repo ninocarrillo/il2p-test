@@ -113,7 +113,8 @@ int main(int arg_count, char* arg_values[]) {
 		printf("\r\n              the packet with bit errors according to specified bit error rate.");
 		printf("\r\n\n     seed:");
 		printf("\r\n              Integer number used to seed random number generator, for test repeatability.");
-		printf("\r\n");
+		printf("\r\n\n     Written by Nino Carrillo, KK4HEJ, kk4hej@gmail.com");
+		printf("\r\n\n");
 
 		return(-1);
 	}
