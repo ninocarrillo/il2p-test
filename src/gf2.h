@@ -8,7 +8,28 @@
 #ifndef GF2_H
 #define	GF2_H
 
-#include "gf2_def_struct.h"
+
+#include "stdint.h"
+
+typedef uint8_t GF2_type;
+
+// Change to suit your application. Bigger = more memory used!
+#define MAX_GF_BITS 8
+
+// Don't change below this line.
+// MAX_FIELD_SIZE controls how much memory is allocated for tables.
+#define MAX_FIELD_SIZE (1 << MAX_GF_BITS)
+
+typedef struct {
+    GF2_type Table[MAX_FIELD_SIZE - 1];
+    GF2_type Index[MAX_FIELD_SIZE];
+    GF2_type Inverse[MAX_FIELD_SIZE];
+    int Power;
+    int GenPoly;
+    int Order;
+    int LFSR;
+    int Mask;
+} GF2_def_struct;
 
 // InitGF2
 // Initializes Galois Field tables in memory to support library functions.
@@ -42,7 +63,7 @@ int GF2Div(int, int, GF2_def_struct*);
 // Arg3: pointer to least significant coefficient of polynomial 2
 // Arg4: number of coefficients in polynomial 2
 // Returns convolved polynomial of length (p1n + p2n - 1).
-int GF2Conv(int*, int, int*, int, GF2_def_struct*);
+int GF2Conv(GF2_type*, int, GF2_type*, int, GF2_def_struct*);
 
 // GF2Pow
 // Returns field primitive (2) raised to Arg.

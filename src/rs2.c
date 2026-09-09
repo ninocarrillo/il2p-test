@@ -1,7 +1,7 @@
 #include "rs2.h"
 #include "gf2.h"
 
-void InitRS2(int first_root, int num_roots, RS2_def_struct *rs) {
+void InitRS2(GF2_type first_root, int num_roots, RS2_def_struct *rs) {
     rs->FirstRoot = first_root;
     rs->NumRoots = num_roots;
     rs->FieldOrder = GF2GetOrder(rs->GF);
@@ -12,7 +12,7 @@ void InitRS2(int first_root, int num_roots, RS2_def_struct *rs) {
 	// b represents the "first consecutive root" of generator polynomial.
     rs->Genpoly[0] = GF2Pow(rs->FirstRoot, rs->GF);
     rs->Genpoly[1] = 1;
-    int factorpoly[2];
+    GF2_type factorpoly[2];
     // preload the x^1 coefficient in the factor polynomial
     factorpoly[1] = 1;
     for (int i = 1; i < num_roots; i++) {
@@ -21,7 +21,7 @@ void InitRS2(int first_root, int num_roots, RS2_def_struct *rs) {
     }
 }
 
-void RSEncode(unsigned char *message, int message_size, RS2_def_struct *rs) {
+void RSEncode(GF2_type *message, int message_size, RS2_def_struct *rs) {
 	// Calculate Reed Solomon parity symbols.
 	// Parity symbols are appended after the message.
 	for (int i = 0; i < rs->NumRoots; i++) {
@@ -193,7 +193,7 @@ void calc_forney(RS2_def_struct *rs) {
 	}
 }
 
-int RSDecode(unsigned char *data_block, int block_size, RS2_def_struct *rs) {
+int RSDecode(GF2_type *data_block, int block_size, RS2_def_struct *rs) {
 	rs->BlockSize = block_size;
 	rs->DataBlock = data_block;
     
