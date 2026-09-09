@@ -107,7 +107,7 @@ int GF2Div(int a_arg, int b_arg, GF2_def_struct *gf) {
 	return gf->Table[a & gf->Mask];
 }
 
-int GF2Conv(int *p1, int p1n, int *p2, int p2n, GF2_def_struct *gf) {
+int GF2Conv(GF2_type *p1, int p1n, GF2_type *p2, int p2n, GF2_def_struct *gf) {
 // convolves two gf polynomials
 // p1 points to polynomial1 containing p1n elements
 // p2 points to polynomial2 containing p2n elements

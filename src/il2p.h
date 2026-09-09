@@ -9,11 +9,10 @@
 #define	IL2P_H
 
 #include "stdint.h"
-#include "rs2_def_struct.h"
-#include "gf2_def_struct.h"
 #include "lfsr_struct.h"
 #include "lfsr.h"
 #include "gf2.h"
+#include "rs2.h"
 #include "intmath.h"
 #include "kiss.h"
 
